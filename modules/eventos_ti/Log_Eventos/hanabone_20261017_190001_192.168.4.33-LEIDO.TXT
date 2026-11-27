@@ -1,0 +1,600 @@
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:02",
+  "CodigoEvento": "postfix/local",
+  "Severidad": "INFORMACION",
+  "Proveedor": "postfix/local ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "A321D40FE147: to=<root@localhost>, orig_to=<root>, relay=local, delay=0.04, delays=0.03/0.01/0/0.01, dsn=2.0.0, status=sent (delivered to mailbox) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:02",
+  "CodigoEvento": "postfix/qmgr",
+  "Severidad": "INFORMACION",
+  "Proveedor": "postfix/qmgr ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "A321D40FE147: removed "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:03",
+  "CodigoEvento": "postfix/pickup",
+  "Severidad": "INFORMACION",
+  "Proveedor": "postfix/pickup ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "6A16440FE147: uid=0 from=<root> "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:03",
+  "CodigoEvento": "postfix/cleanup",
+  "Severidad": "INFORMACION",
+  "Proveedor": "postfix/cleanup ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "6A16440FE147: message-id=<20261017230003.6A16440FE147@localhost> "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:03",
+  "CodigoEvento": "CRON",
+  "Severidad": "INFORMACION",
+  "Proveedor": "CRON ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de tarea programada ",
+  "Mensaje": "(root) CMDEND (/bin/bash /opt/scripts/generar_eventos_TI.sh) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:03",
+  "CodigoEvento": "CRON",
+  "Severidad": "INFORMACION",
+  "Proveedor": "CRON ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de tarea programada ",
+  "Mensaje": "pam_unix(crond:session): session closed for user root "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:03",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "session-c2866.scope: Deactivated successfully. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:03",
+  "CodigoEvento": "postfix/qmgr",
+  "Severidad": "INFORMACION",
+  "Proveedor": "postfix/qmgr ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "6A16440FE147: from=<root@localhost>, size=971, nrcpt=1 (queue active) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:03",
+  "CodigoEvento": "postfix/local",
+  "Severidad": "INFORMACION",
+  "Proveedor": "postfix/local ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "6A16440FE147: to=<root@localhost>, orig_to=<root>, relay=local, delay=0.03, delays=0.02/0/0/0.01, dsn=2.0.0, status=sent (delivered to mailbox) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:03",
+  "CodigoEvento": "postfix/qmgr",
+  "Severidad": "INFORMACION",
+  "Proveedor": "postfix/qmgr ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "6A16440FE147: removed "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:00:03",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "session-c2866.scope: Consumed 2.756s CPU time. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:01:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "snapperd.service: Deactivated successfully. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:03:50",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "[2026/10/17 18:03:50.413159,  0] ../../source3/nmbd/nmbd_browsesync.c:355(find_domain_master_name_query_fail) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:03:50",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  find_domain_master_name_query_fail: "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:03:50",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  Unable to find the Domain Master Browser name WORKGROUP<1b> for the workgroup WORKGROUP. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:03:50",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  Unable to sync browse lists in this workgroup. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:18:51",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "[2026/10/17 18:18:51.431876,  0] ../../source3/nmbd/nmbd_browsesync.c:355(find_domain_master_name_query_fail) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:18:51",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  find_domain_master_name_query_fail: "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:18:51",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  Unable to find the Domain Master Browser name WORKGROUP<1b> for the workgroup WORKGROUP. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:18:51",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  Unable to sync browse lists in this workgroup. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:30:08",
+  "CodigoEvento": "sudo",
+  "Severidad": "INFORMACION",
+  "Proveedor": "sudo ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de privilegios sudo ",
+  "Mensaje": "    root : PWD=/usr/sap/SAPBusinessOne/SLDAgent ; USER=root ; ENV=SHARE_NAME=B1_SHF ACTION=find-share-location ; COMMAND=/usr/sap/SAPBusinessOne/SLDAgent/tools/sld_cd_util.sh "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:30:08",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Started Session c2867 of User root. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:30:08",
+  "CodigoEvento": "sudo",
+  "Severidad": "INFORMACION",
+  "Proveedor": "sudo ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de privilegios sudo ",
+  "Mensaje": "pam_unix(sudo:session): session opened for user root by (uid=0) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:30:08",
+  "CodigoEvento": "sudo",
+  "Severidad": "INFORMACION",
+  "Proveedor": "sudo ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de privilegios sudo ",
+  "Mensaje": "pam_unix(sudo:session): session closed for user root "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:30:08",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "session-c2867.scope: Deactivated successfully. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:30:08",
+  "CodigoEvento": "sudo",
+  "Severidad": "INFORMACION",
+  "Proveedor": "sudo ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de privilegios sudo ",
+  "Mensaje": "    root : PWD=/usr/sap/SAPBusinessOne/SLDAgent ; USER=root ; ENV=SHARE_NAME=SCSW_WORKING_SHARE ACTION=find-share-location ; COMMAND=/usr/sap/SAPBusinessOne/SLDAgent/tools/sld_cd_util.sh "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:30:08",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Started Session c2868 of User root. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:30:08",
+  "CodigoEvento": "sudo",
+  "Severidad": "INFORMACION",
+  "Proveedor": "sudo ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de privilegios sudo ",
+  "Mensaje": "pam_unix(sudo:session): session opened for user root by (uid=0) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:30:08",
+  "CodigoEvento": "sudo",
+  "Severidad": "INFORMACION",
+  "Proveedor": "sudo ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de privilegios sudo ",
+  "Mensaje": "pam_unix(sudo:session): session closed for user root "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:30:08",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "session-c2868.scope: Deactivated successfully. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:33:50",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "[2026/10/17 18:33:50.440868,  0] ../../source3/nmbd/nmbd_browsesync.c:355(find_domain_master_name_query_fail) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:33:50",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  find_domain_master_name_query_fail: "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:33:50",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  Unable to find the Domain Master Browser name WORKGROUP<1b> for the workgroup WORKGROUP. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:33:50",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  Unable to sync browse lists in this workgroup. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:48:51",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "[2026/10/17 18:48:51.458914,  0] ../../source3/nmbd/nmbd_browsesync.c:355(find_domain_master_name_query_fail) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:48:51",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  find_domain_master_name_query_fail: "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:48:51",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  Unable to find the Domain Master Browser name WORKGROUP<1b> for the workgroup WORKGROUP. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 18:48:51",
+  "CodigoEvento": "nmbd",
+  "Severidad": "ERROR",
+  "Proveedor": "nmbd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "  Unable to sync browse lists in this workgroup. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Started Timeline of Snapper Snapshots. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Started Session c2869 of User root. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "dbus-daemon",
+  "Severidad": "INFORMACION",
+  "Proveedor": "dbus-daemon ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "[system] Activating via systemd: service name='org.opensuse.Snapper' unit='snapperd.service' requested by ':1.8244' (uid=0 pid=19135 comm=\\ "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Started Session c2870 of User root. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Starting DBus interface for snapper... "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "cron",
+  "Severidad": "INFORMACION",
+  "Proveedor": "cron ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de tarea programada ",
+  "Mensaje": "pam_unix(crond:session): session opened for user root by (uid=0) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "CRON",
+  "Severidad": "INFORMACION",
+  "Proveedor": "CRON ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de tarea programada ",
+  "Mensaje": "(root) CMD (/bin/bash /opt/scripts/generar_eventos_TI.sh) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "dbus-daemon",
+  "Severidad": "INFORMACION",
+  "Proveedor": "dbus-daemon ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "[system] Successfully activated service 'org.opensuse.Snapper' "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Started DBus interface for snapper. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "snapper-timeline.service: Deactivated successfully. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "cron",
+  "Severidad": "INFORMACION",
+  "Proveedor": "cron ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de tarea programada ",
+  "Mensaje": "pam_unix(crond:session): session opened for user root by (uid=0) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-17 19:00:01",
+  "CodigoEvento": "CRON",
+  "Severidad": "INFORMACION",
+  "Proveedor": "CRON ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de tarea programada ",
+  "Mensaje": "(root) CMD (/bin/bash /opt/scripts/generar_capacidad_TI.sh) "
+}
+

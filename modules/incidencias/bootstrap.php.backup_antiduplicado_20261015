@@ -1,0 +1,513 @@
+<?php
+/**
+ * Datos, reglas y utilidades del modulo de Mesa de Ayuda.
+ */
+
+if (!function_exists('inc_h')) {
+    function inc_h($value): string
+    {
+        return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (!function_exists('inc_user')) {
+    function inc_user(): array
+    {
+        $user = function_exists('current_user') ? current_user() : null;
+        return is_array($user) ? $user : [];
+    }
+}
+
+if (!function_exists('inc_user_id')) {
+    function inc_user_id(): int
+    {
+        $user = inc_user();
+        return (int)($user['id'] ?? 0);
+    }
+}
+
+if (!function_exists('inc_is_agent')) {
+    function inc_is_agent(): bool
+    {
+        if (function_exists('tiene_permiso') && tiene_permiso('incidencias', 'editar')) return true;
+        $user = inc_user();
+        return (int)($user['status'] ?? 0) === 1 && (int)($user['es_personal_ti'] ?? 0) === 1;
+    }
+}
+
+if (!function_exists('inc_priority')) {
+    function inc_priority(int $impact, int $urgency): string
+    {
+        $score = max(1, min(4, $impact)) * max(1, min(4, $urgency));
+        if ($score >= 12) return 'CRITICA';
+        if ($score >= 8) return 'ALTA';
+        if ($score >= 4) return 'MEDIA';
+        return 'BAJA';
+    }
+}
+
+if (!function_exists('inc_priority_label')) {
+    function inc_priority_label(string $priority): string
+    {
+        return ['CRITICA' => 'Critica', 'ALTA' => 'Alta', 'MEDIA' => 'Media', 'BAJA' => 'Baja'][$priority] ?? $priority;
+    }
+}
+
+if (!function_exists('inc_status_label')) {
+    function inc_status_label(string $status): string
+    {
+        $labels = [
+            'NUEVO' => 'Nuevo',
+            'ASIGNADO' => 'Asignado',
+            'EN_PROGRESO' => 'En progreso',
+            'PENDIENTE_USUARIO' => 'Pendiente del usuario',
+            'PENDIENTE_TERCERO' => 'Pendiente de tercero',
+            'RESUELTO' => 'Resuelto',
+            'CERRADO' => 'Cerrado',
+            'CANCELADO' => 'Cancelado',
+        ];
+        return $labels[$status] ?? $status;
+    }
+}
+
+if (!function_exists('inc_type_label')) {
+    function inc_type_label(string $type): string
+    {
+        return (['INCIDENTE'=>'Incidente','SOLICITUD'=>'Solicitud de servicio','EVENTO'=>'Evento'][$type] ?? $type);
+    }
+}
+
+if (!function_exists('inc_datetime')) {
+    function inc_datetime(?string $value, string $format = 'd/m/Y H:i'): string
+    {
+        if (!$value || $value === '0000-00-00 00:00:00') return '-';
+        $time = strtotime($value);
+        return $time ? date($format, $time) : '-';
+    }
+}
+
+if (!function_exists('inc_duration')) {
+    function inc_duration($minutes): string
+    {
+        if ($minutes === null || $minutes === '') return '-';
+        $minutes = max(0, (int)round((float)$minutes));
+        $days = intdiv($minutes, 1440);
+        $hours = intdiv($minutes % 1440, 60);
+        $mins = $minutes % 60;
+        $parts = [];
+        if ($days) $parts[] = $days.' d';
+        if ($hours) $parts[] = $hours.' h';
+        if ($mins || !$parts) $parts[] = $mins.' min';
+        return implode(' ', $parts);
+    }
+}
+
+if (!function_exists('inc_schema')) {
+    function inc_schema(): void
+    {
+        global $db;
+        static $ready = false;
+        if ($ready) return;
+
+        if (function_exists('ensure_users_tipo_registro')) ensure_users_tipo_registro();
+
+        $queries = [
+            "CREATE TABLE IF NOT EXISTS inc_categorias (
+                IdCategoria INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                Codigo VARCHAR(30) NOT NULL,
+                Nombre VARCHAR(100) NOT NULL,
+                Descripcion VARCHAR(400) NULL,
+                Icono VARCHAR(50) NOT NULL DEFAULT 'fas fa-ticket-alt',
+                Color VARCHAR(20) NOT NULL DEFAULT '#128698',
+                IdPadre INT UNSIGNED NULL,
+                Activa TINYINT(1) NOT NULL DEFAULT 1,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (IdCategoria),
+                UNIQUE KEY uq_inc_categoria_codigo (Codigo),
+                KEY idx_inc_categoria_estado (Activa,Nombre),
+                KEY idx_inc_categoria_padre (IdPadre)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS inc_sla_politicas (
+                IdSLA INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                Nombre VARCHAR(100) NOT NULL,
+                Prioridad VARCHAR(12) NOT NULL,
+                MinutosRespuesta INT UNSIGNED NOT NULL,
+                MinutosResolucion INT UNSIGNED NOT NULL,
+                Horario VARCHAR(30) NOT NULL DEFAULT 'CALENDARIO',
+                Descripcion VARCHAR(400) NULL,
+                Activa TINYINT(1) NOT NULL DEFAULT 1,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (IdSLA),
+                UNIQUE KEY uq_inc_sla_prioridad (Prioridad),
+                KEY idx_inc_sla_estado (Activa)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS inc_tickets (
+                IdTicket BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                Folio VARCHAR(24) NULL,
+                Tipo VARCHAR(20) NOT NULL DEFAULT 'INCIDENTE',
+                Canal VARCHAR(20) NOT NULL DEFAULT 'PORTAL',
+                Titulo VARCHAR(180) NOT NULL,
+                Descripcion TEXT NOT NULL,
+                IdCategoria INT UNSIGNED NULL,
+                IdMaquina INT NULL,
+                IdServicio INT NULL,
+                IdAplicacionCapacidad INT UNSIGNED NULL,
+                IdServicioCapacidad INT UNSIGNED NULL,
+                SolicitanteId INT UNSIGNED NOT NULL,
+                SolicitanteNombre VARCHAR(100) NOT NULL,
+                SolicitanteCorreo VARCHAR(120) NULL,
+                SolicitanteArea VARCHAR(80) NULL,
+                Impacto TINYINT UNSIGNED NOT NULL DEFAULT 2,
+                Urgencia TINYINT UNSIGNED NOT NULL DEFAULT 2,
+                Prioridad VARCHAR(12) NOT NULL DEFAULT 'MEDIA',
+                IdSLA INT UNSIGNED NULL,
+                Estado VARCHAR(30) NOT NULL DEFAULT 'NUEVO',
+                AsignadoA INT UNSIGNED NULL,
+                AsignadoNombre VARCHAR(100) NULL,
+                GrupoAsignacion VARCHAR(80) NOT NULL DEFAULT 'SOPORTE TI',
+                FechaRegistro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FechaPrimeraRespuesta DATETIME NULL,
+                FechaObjetivoRespuesta DATETIME NULL,
+                FechaObjetivoResolucion DATETIME NULL,
+                FechaResolucion DATETIME NULL,
+                FechaCierre DATETIME NULL,
+                PausaSLAInicio DATETIME NULL,
+                MinutosPausa INT UNSIGNED NOT NULL DEFAULT 0,
+                Resolucion TEXT NULL,
+                CausaRaiz TEXT NULL,
+                TipoTratamiento VARCHAR(80) NULL,
+                InformeTratamiento VARCHAR(10) NULL,
+                SacGenerada VARCHAR(15) NULL,
+                CodigoSAC VARCHAR(60) NULL,
+                ObservacionesTratamiento TEXT NULL,
+                TratamientoActualizadoPor INT UNSIGNED NULL,
+                TratamientoActualizadoNombre VARCHAR(100) NULL,
+                FechaTratamiento DATETIME NULL,
+                CodigoCierre VARCHAR(40) NULL,
+                LlamadosUsuario TINYINT UNSIGNED NOT NULL DEFAULT 0,
+                FechaUltimoLlamado DATETIME NULL,
+                FechaLimiteRespuesta DATETIME NULL,
+                ConfirmacionUsuario VARCHAR(20) NULL,
+                FechaConfirmacionUsuario DATETIME NULL,
+                Satisfaccion TINYINT UNSIGNED NULL,
+                ComentarioSatisfaccion VARCHAR(500) NULL,
+                Reaperturas SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                CreadoPor INT UNSIGNED NOT NULL,
+                ActualizadoPor INT UNSIGNED NOT NULL,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (IdTicket),
+                UNIQUE KEY uq_inc_ticket_folio (Folio),
+                KEY idx_inc_ticket_fecha (FechaRegistro),
+                KEY idx_inc_ticket_estado (Estado),
+                KEY idx_inc_ticket_prioridad (Prioridad),
+                KEY idx_inc_ticket_solicitante (SolicitanteId),
+                KEY idx_inc_ticket_asignado (AsignadoA),
+                KEY idx_inc_ticket_categoria (IdCategoria),
+                KEY idx_inc_ticket_maquina (IdMaquina),
+                KEY idx_inc_ticket_servicio (IdServicio),
+                KEY idx_inc_ticket_aplicacion_cap (IdAplicacionCapacidad),
+                KEY idx_inc_ticket_servicio_cap (IdServicioCapacidad),
+                CONSTRAINT fk_inc_ticket_categoria FOREIGN KEY (IdCategoria) REFERENCES inc_categorias (IdCategoria) ON DELETE SET NULL,
+                CONSTRAINT fk_inc_ticket_sla FOREIGN KEY (IdSLA) REFERENCES inc_sla_politicas (IdSLA) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS inc_seguimiento (
+                IdSeguimiento BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                IdTicket BIGINT UNSIGNED NOT NULL,
+                UsuarioId INT UNSIGNED NOT NULL,
+                UsuarioNombre VARCHAR(100) NOT NULL,
+                Tipo VARCHAR(30) NOT NULL DEFAULT 'COMENTARIO',
+                Comentario TEXT NOT NULL,
+                EsPublico TINYINT(1) NOT NULL DEFAULT 1,
+                EstadoAnterior VARCHAR(30) NULL,
+                EstadoNuevo VARCHAR(30) NULL,
+                Fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (IdSeguimiento),
+                KEY idx_inc_seg_ticket_fecha (IdTicket,Fecha),
+                CONSTRAINT fk_inc_seg_ticket FOREIGN KEY (IdTicket) REFERENCES inc_tickets (IdTicket) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS inc_adjuntos (
+                IdAdjunto BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                IdTicket BIGINT UNSIGNED NOT NULL,
+                IdSeguimiento BIGINT UNSIGNED NULL,
+                NombreOriginal VARCHAR(255) NOT NULL,
+                NombreArchivo VARCHAR(255) NOT NULL,
+                Ruta VARCHAR(500) NOT NULL,
+                Mime VARCHAR(120) NULL,
+                Tamano BIGINT UNSIGNED NOT NULL DEFAULT 0,
+                SubidoPor INT UNSIGNED NOT NULL,
+                SubidoPorNombre VARCHAR(100) NOT NULL,
+                Fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                Activo TINYINT(1) NOT NULL DEFAULT 1,
+                PRIMARY KEY (IdAdjunto),
+                KEY idx_inc_adj_ticket (IdTicket,Activo),
+                KEY idx_inc_adj_seguimiento (IdSeguimiento),
+                CONSTRAINT fk_inc_adj_ticket FOREIGN KEY (IdTicket) REFERENCES inc_tickets (IdTicket) ON DELETE CASCADE,
+                CONSTRAINT fk_inc_adj_seguimiento FOREIGN KEY (IdSeguimiento) REFERENCES inc_seguimiento (IdSeguimiento) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS inc_notificaciones (
+                IdNotificacion BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                IdTicket BIGINT UNSIGNED NOT NULL,
+                Evento VARCHAR(30) NOT NULL,
+                CorreoDestino VARCHAR(160) NULL,
+                Asunto VARCHAR(240) NOT NULL,
+                Estado VARCHAR(20) NOT NULL,
+                Detalle VARCHAR(1000) NULL,
+                Fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (IdNotificacion),
+                KEY idx_inc_not_ticket_fecha (IdTicket,Fecha),
+                KEY idx_inc_not_estado (Estado),
+                CONSTRAINT fk_inc_not_ticket FOREIGN KEY (IdTicket) REFERENCES inc_tickets (IdTicket) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        ];
+        foreach ($queries as $query) $db->query($query);
+
+        $ticketColumns = [
+            'IdServicio' => "INT NULL AFTER IdMaquina",
+            'IdAplicacionCapacidad' => "INT UNSIGNED NULL AFTER IdServicio",
+            'IdServicioCapacidad' => "INT UNSIGNED NULL AFTER IdAplicacionCapacidad",
+            'TipoTratamiento' => "VARCHAR(80) NULL AFTER CausaRaiz",
+            'InformeTratamiento' => "VARCHAR(10) NULL AFTER TipoTratamiento",
+            'SacGenerada' => "VARCHAR(15) NULL AFTER InformeTratamiento",
+            'CodigoSAC' => "VARCHAR(60) NULL AFTER SacGenerada",
+            'ObservacionesTratamiento' => "TEXT NULL AFTER CodigoSAC",
+            'TratamientoActualizadoPor' => "INT UNSIGNED NULL AFTER ObservacionesTratamiento",
+            'TratamientoActualizadoNombre' => "VARCHAR(100) NULL AFTER TratamientoActualizadoPor",
+            'FechaTratamiento' => "DATETIME NULL AFTER TratamientoActualizadoNombre",
+            'LlamadosUsuario' => "TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER CodigoCierre",
+            'FechaUltimoLlamado' => "DATETIME NULL AFTER LlamadosUsuario",
+            'FechaLimiteRespuesta' => "DATETIME NULL AFTER FechaUltimoLlamado",
+            'ConfirmacionUsuario' => "VARCHAR(20) NULL AFTER FechaLimiteRespuesta",
+            'FechaConfirmacionUsuario' => "DATETIME NULL AFTER ConfirmacionUsuario",
+        ];
+        foreach ($ticketColumns as $column => $definition) {
+            $exists = $db->query("SHOW COLUMNS FROM inc_tickets LIKE '".$db->escape($column)."'");
+            if (!$db->num_rows($exists)) $db->query("ALTER TABLE inc_tickets ADD COLUMN {$column} {$definition}");
+        }
+        foreach (['idx_inc_ticket_aplicacion_cap'=>'IdAplicacionCapacidad','idx_inc_ticket_servicio_cap'=>'IdServicioCapacidad'] as $index => $column) {
+            $exists = $db->query("SHOW INDEX FROM inc_tickets WHERE Key_name='".$db->escape($index)."'");
+            if (!$db->num_rows($exists)) $db->query("ALTER TABLE inc_tickets ADD KEY {$index} ({$column})");
+        }
+        $db->query("UPDATE inc_tickets SET Estado='EN_PROGRESO' WHERE Estado='ASIGNADO'");
+        $categories = [
+            ['HW', 'Hardware y equipos', 'Fallas fisicas, perifericos y componentes.', 'fas fa-desktop', '#167d91'],
+            ['SW', 'Software y aplicaciones', 'Errores de programas, instalaciones y configuracion.', 'fas fa-window-restore', '#3376c4'],
+            ['ACC', 'Accesos e identidad', 'Cuentas, permisos, contrasenas y altas o bajas.', 'fas fa-user-shield', '#9a5cc4'],
+            ['RED', 'Red y conectividad', 'Internet, Wi-Fi, VPN, cableado y comunicaciones.', 'fas fa-network-wired', '#de7a2f'],
+            ['COR', 'Correo y colaboracion', 'Correo, Microsoft 365 y herramientas colaborativas.', 'fas fa-envelope-open-text', '#249b75'],
+            ['SAP', 'SAP y sistemas de negocio', 'Incidencias y solicitudes de aplicaciones empresariales.', 'fas fa-cubes', '#c54f51'],
+            ['SEG', 'Seguridad de la informacion', 'Eventos, bloqueos, malware y riesgos de seguridad.', 'fas fa-shield-alt', '#bb3d55'],
+            ['EVT', 'Eventos y monitoreo', 'Alertas, logs y hechos detectados por usuarios o herramientas de monitoreo.', 'fas fa-wave-square', '#546e7a'],
+            ['IMP', 'Impresion y digitalizacion', 'Impresoras, escaneres, consumibles y colas.', 'fas fa-print', '#667b8c'],
+            ['OTR', 'Otros servicios TI', 'Casos que requieren clasificacion por la Mesa de Ayuda.', 'fas fa-ellipsis-h', '#718096'],
+        ];
+        foreach ($categories as $row) {
+            $values = array_map([$db, 'escape'], $row);
+            $db->query("INSERT IGNORE INTO inc_categorias (Codigo,Nombre,Descripcion,Icono,Color) VALUES ('".implode("','", $values)."')");
+        }
+
+        $eventCategory = find_by_sql("SELECT IdCategoria FROM inc_categorias WHERE Codigo='EVT' LIMIT 1");
+        $eventTable = $db->query("SHOW TABLES LIKE 'evt_eventos'");
+        if ($eventCategory && $db->num_rows($eventTable)) {
+            $eventCategoryId = (int)$eventCategory[0]['IdCategoria'];
+            $db->query("UPDATE inc_tickets t INNER JOIN evt_eventos e ON e.IdIncidencia=t.IdTicket
+                SET t.Tipo='EVENTO',t.IdCategoria={$eventCategoryId}
+                WHERE t.Tipo<>'EVENTO' OR t.IdCategoria<>{$eventCategoryId}");
+        }
+
+        $slas = [
+            ['SLA Critico', 'CRITICA', 15, 240, 'Interrupcion critica o impacto general.'],
+            ['SLA Alto', 'ALTA', 60, 480, 'Impacto alto que requiere atencion prioritaria.'],
+            ['SLA Medio', 'MEDIA', 240, 1440, 'Atencion estandar de la Mesa de Ayuda.'],
+            ['SLA Bajo', 'BAJA', 480, 2880, 'Impacto acotado o solicitud planificable.'],
+        ];
+        foreach ($slas as $row) {
+            $name = $db->escape($row[0]);
+            $priority = $db->escape($row[1]);
+            $description = $db->escape($row[4]);
+            $db->query("INSERT IGNORE INTO inc_sla_politicas (Nombre,Prioridad,MinutosRespuesta,MinutosResolucion,Descripcion) VALUES ('{$name}','{$priority}',{$row[2]},{$row[3]},'{$description}')");
+        }
+
+        $tables = $db->query("SHOW TABLES LIKE 'modulos'");
+        if ($db->num_rows($tables)) {
+            $db->query("INSERT INTO modulos (slug,nombre,descripcion,icono,estado,orden)
+                SELECT 'incidencias','Mesa de Ayuda TI','Incidentes, solicitudes, SLA, evidencias e indicadores','fas fa-headset',1,45
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM modulos WHERE slug='incidencias')");
+            $db->query("UPDATE modulos SET nombre='Mesa de Ayuda TI',descripcion='Incidentes, solicitudes, SLA, evidencias e indicadores',icono='fas fa-headset',estado=1 WHERE slug='incidencias'");
+        }
+
+        $permTables = $db->query("SHOW TABLES LIKE 'permisos_modulos'");
+        $groupTables = $db->query("SHOW TABLES LIKE 'user_groups'");
+        if ($db->num_rows($permTables) && $db->num_rows($groupTables)) {
+            $groups = $db->query("SELECT group_level FROM user_groups WHERE group_status=1");
+            while ($group = $db->fetch_assoc($groups)) {
+                $level = (int)$group['group_level'];
+                $create = 1;
+                $edit = $level <= 2 ? 1 : 0;
+                $delete = $level === 1 ? 1 : 0;
+                $db->query("INSERT IGNORE INTO permisos_modulos (group_level,modulo,puede_ver,puede_crear,puede_editar,puede_eliminar)
+                    VALUES ({$level},'incidencias',1,{$create},{$edit},{$delete})");
+            }
+        }
+
+        $ready = true;
+    }
+}
+
+if (!function_exists('inc_add_timeline')) {
+    function inc_add_timeline(int $ticketId, string $type, string $comment, bool $public = true, ?string $oldStatus = null, ?string $newStatus = null): int
+    {
+        global $db;
+        $user = inc_user();
+        $userId = (int)($user['id'] ?? 0);
+        $userName = $db->escape((string)($user['name'] ?? $user['username'] ?? 'Sistema'));
+        $type = $db->escape($type);
+        $comment = $db->escape($comment);
+        $oldSql = $oldStatus === null ? 'NULL' : "'".$db->escape($oldStatus)."'";
+        $newSql = $newStatus === null ? 'NULL' : "'".$db->escape($newStatus)."'";
+        $db->query("INSERT INTO inc_seguimiento (IdTicket,UsuarioId,UsuarioNombre,Tipo,Comentario,EsPublico,EstadoAnterior,EstadoNuevo)
+            VALUES ({$ticketId},{$userId},'{$userName}','{$type}','{$comment}',".($public ? 1 : 0).",{$oldSql},{$newSql})");
+        return (int)$db->insert_id();
+    }
+}
+
+if (!function_exists('inc_ticket_scope_sql')) {
+    function inc_ticket_scope_sql(string $alias = 't'): string
+    {
+        if (inc_is_agent()) return '1=1';
+        return $alias.'.SolicitanteId='.(int)inc_user_id();
+    }
+}
+
+if (!function_exists('inc_can_view_ticket')) {
+    function inc_can_view_ticket(array $ticket): bool
+    {
+        return inc_is_agent() || (int)($ticket['SolicitanteId'] ?? 0) === inc_user_id();
+    }
+}
+
+if (!function_exists('inc_upload_root')) {
+    function inc_upload_root(): string
+    {
+        return dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'uploads'.DIRECTORY_SEPARATOR.'incidencias';
+    }
+}
+
+if (!function_exists('inc_normalize_uploads')) {
+    function inc_normalize_uploads(string $field): array
+    {
+        if (empty($_FILES[$field]) || !is_array($_FILES[$field])) return [];
+        $file = $_FILES[$field];
+        if (!is_array($file['name'] ?? null)) return [$file];
+        $items = [];
+        foreach ($file['name'] as $index => $name) {
+            $items[] = [
+                'name' => $name,
+                'type' => $file['type'][$index] ?? '',
+                'tmp_name' => $file['tmp_name'][$index] ?? '',
+                'error' => $file['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+                'size' => $file['size'][$index] ?? 0,
+            ];
+        }
+        return $items;
+    }
+}
+
+if (!function_exists('inc_store_uploads')) {
+    function inc_store_uploads(int $ticketId, string $field = 'adjuntos', int $trackingId = 0): array
+    {
+        global $db;
+        $result = ['added' => 0, 'errors' => []];
+        $allowed = [
+            'jpg' => ['image/jpeg'], 'jpeg' => ['image/jpeg'], 'png' => ['image/png'], 'webp' => ['image/webp'],
+            'pdf' => ['application/pdf'], 'txt' => ['text/plain'], 'csv' => ['text/plain', 'text/csv', 'application/vnd.ms-excel'],
+            'doc' => ['application/msword', 'application/octet-stream', 'application/x-ole-storage', 'application/CDFV2'],
+            'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip', 'application/octet-stream'],
+            'xls' => ['application/vnd.ms-excel', 'application/octet-stream', 'application/x-ole-storage', 'application/CDFV2'],
+            'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip', 'application/octet-stream'],
+            'msg' => ['application/vnd.ms-outlook', 'application/octet-stream', 'application/x-ole-storage', 'application/CDFV2'],
+            'eml' => ['message/rfc822', 'text/plain', 'application/octet-stream'],
+        ];
+        $files = inc_normalize_uploads($field);
+        if (count($files) > 8) {
+            $result['errors'][] = 'Puede adjuntar como maximo 8 archivos por operacion.';
+            $files = array_slice($files, 0, 8);
+        }
+        $directory = inc_upload_root().DIRECTORY_SEPARATOR.date('Y').DIRECTORY_SEPARATOR.date('m');
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            $result['errors'][] = 'No se pudo preparar la carpeta de evidencias.';
+            return $result;
+        }
+        foreach ($files as $file) {
+            $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($error === UPLOAD_ERR_NO_FILE) continue;
+            if ($error !== UPLOAD_ERR_OK) {
+                $result['errors'][] = 'No se pudo recibir '.basename((string)($file['name'] ?? 'archivo')).'.';
+                continue;
+            }
+            $size = (int)($file['size'] ?? 0);
+            if ($size <= 0 || $size > 15 * 1024 * 1024) {
+                $result['errors'][] = basename((string)$file['name']).' supera el limite de 15 MB o esta vacio.';
+                continue;
+            }
+            $original = basename((string)$file['name']);
+            $extension = strtolower(pathinfo($original, PATHINFO_EXTENSION));
+            if (!isset($allowed[$extension])) {
+                $result['errors'][] = $original.' tiene un formato no permitido.';
+                continue;
+            }
+            $mime = 'application/octet-stream';
+            if (function_exists('finfo_open')) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                if ($finfo) {
+                    $detected = finfo_file($finfo, (string)$file['tmp_name']);
+                    if (is_string($detected) && $detected !== '') $mime = $detected;
+                    finfo_close($finfo);
+                }
+            }
+            if (!in_array($mime, $allowed[$extension], true)) {
+                $result['errors'][] = $original.' no coincide con el tipo de archivo esperado.';
+                continue;
+            }
+            $stored = date('Ymd_His').'_'.$ticketId.'_'.bin2hex(random_bytes(8)).'.'.$extension;
+            $target = $directory.DIRECTORY_SEPARATOR.$stored;
+            if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
+                $result['errors'][] = 'No se pudo guardar '.$original.'.';
+                continue;
+            }
+            $relative = date('Y').'/'.date('m').'/'.$stored;
+            $originalSql = $db->escape($original);
+            $storedSql = $db->escape($stored);
+            $relativeSql = $db->escape($relative);
+            $mimeSql = $db->escape($mime);
+            $user = inc_user();
+            $userId = (int)($user['id'] ?? 0);
+            $userName = $db->escape((string)($user['name'] ?? $user['username'] ?? 'Sistema'));
+            $trackingSql = $trackingId > 0 ? (string)$trackingId : 'NULL';
+            $db->query("INSERT INTO inc_adjuntos (IdTicket,IdSeguimiento,NombreOriginal,NombreArchivo,Ruta,Mime,Tamano,SubidoPor,SubidoPorNombre)
+                VALUES ({$ticketId},{$trackingSql},'{$originalSql}','{$storedSql}','{$relativeSql}','{$mimeSql}',{$size},{$userId},'{$userName}')");
+            $result['added']++;
+        }
+        return $result;
+    }
+}
+
+if (!function_exists('inc_sla_for_priority')) {
+    function inc_sla_for_priority(string $priority): ?array
+    {
+        global $db;
+        $priority = $db->escape($priority);
+        $query = $db->query("SELECT * FROM inc_sla_politicas WHERE Prioridad='{$priority}' AND Activa=1 LIMIT 1");
+        return $db->num_rows($query) ? $db->fetch_assoc($query) : null;
+    }
+}
+
+if (!function_exists('inc_redirect')) {
+    function inc_redirect(string $message, string $type = 's', string $url = 'index.php'): void
+    {
+        global $session;
+        $session->msg($type, $message);
+        redirect($url, false);
+    }
+}

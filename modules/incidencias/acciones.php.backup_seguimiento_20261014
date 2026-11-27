@@ -1,0 +1,436 @@
+<?php
+$page_title = 'Mesa de Ayuda TI';
+require_once __DIR__.'/../../includes/load.php';
+require_once __DIR__.'/../../config/app.php';
+require_once __DIR__.'/bootstrap.php';
+require_once __DIR__.'/notificaciones.php';
+
+inc_schema();
+require_permiso('incidencias', 'ver');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirect('index.php', false);
+}
+
+function inc_post(string $name, string $default = ''): string
+{
+    return trim((string)($_POST[$name] ?? $default));
+}
+
+function inc_find_ticket(int $id): ?array
+{
+    global $db;
+    $result = $db->query("SELECT t.*,m.Host,m.Tipo_Activo,m.Ip,
+        sv.CodigoServicio,sv.NombreServicio,sv.EstadoServicio,
+        a.NombreAplicacion,a.TipoAplicacion,a.EstadoAplicacion,
+        cs.NombreServicio NombreServicioCapacidad,cs.Categoria CategoriaServicioCapacidad,cs.EstadoServicio EstadoServicioCapacidad,
+        COALESCE(a.NombreAplicacion,cs.NombreServicio,sv.NombreServicio) NombreElementoAfectado
+        FROM inc_tickets t
+        LEFT JOIN maquina m ON m.IdMaquina=t.IdMaquina
+        LEFT JOIN servicios_ti sv ON sv.IdServicio=t.IdServicio
+        LEFT JOIN aplicacion a ON a.IdAplicacion=t.IdAplicacionCapacidad
+        LEFT JOIN servicio_ti cs ON cs.IdServicio=t.IdServicioCapacidad
+        WHERE t.IdTicket={$id} LIMIT 1");
+    return $db->num_rows($result) ? $db->fetch_assoc($result) : null;
+}
+
+function inc_has_uploaded_files(string $field = 'adjuntos'): bool
+{
+    if (empty($_FILES[$field])) return false;
+    $errors = $_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE;
+    if (!is_array($errors)) return (int)$errors !== UPLOAD_ERR_NO_FILE;
+    foreach ($errors as $error) if ((int)$error !== UPLOAD_ERR_NO_FILE) return true;
+    return false;
+}
+
+$action = inc_post('action');
+$user = inc_user();
+$userId = (int)($user['id'] ?? 0);
+$userName = trim((string)($user['name'] ?? $user['username'] ?? 'Usuario'));
+
+if ($action === 'crear_ticket') {
+    if (!tiene_permiso('incidencias', 'crear')) inc_redirect('No tiene permiso para registrar tickets.', 'd');
+
+    $title = inc_post('Titulo');
+    $description = inc_post('Descripcion');
+    $type = strtoupper(inc_post('Tipo', 'INCIDENTE'));
+    $channel = strtoupper(inc_post('Canal', 'PORTAL'));
+    $categoryId = (int)($_POST['IdCategoria'] ?? 0);
+    $machineId = (int)($_POST['IdMaquina'] ?? 0);
+    $errors = [];
+    $affectedElement = strtoupper(inc_post('ElementoAfectado'));
+    $capacityApplicationId = 0;
+    $capacityServiceId = 0;
+    if (preg_match('/^(APP|SRV):(\d+)$/', $affectedElement, $affectedMatch)) {
+        if ($affectedMatch[1] === 'APP') $capacityApplicationId = (int)$affectedMatch[2];
+        if ($affectedMatch[1] === 'SRV') $capacityServiceId = (int)$affectedMatch[2];
+    } elseif ($affectedElement !== '') {
+        $errors[] = 'La aplicación o servicio TI seleccionado no es válido.';
+    }
+    $impact = (int)($_POST['Impacto'] ?? 2);
+    $urgency = (int)($_POST['Urgencia'] ?? 2);
+    $requesterId = inc_is_agent() ? (int)($_POST['SolicitanteId'] ?? $userId) : $userId;
+    $assigneeId = inc_is_agent() ? (int)($_POST['AsignadoA'] ?? 0) : 0;
+    if (mb_strlen($title) < 5 || mb_strlen($title) > 180) $errors[] = 'El asunto debe tener entre 5 y 180 caracteres.';
+    if (mb_strlen($description) < 10) $errors[] = 'Describa el caso con al menos 10 caracteres.';
+    if (!in_array($type, ['INCIDENTE', 'SOLICITUD', 'EVENTO'], true)) $errors[] = 'El tipo de ticket no es valido.';
+    if (!in_array($channel, ['PORTAL', 'CORREO', 'TELEFONO', 'PRESENCIAL', 'MONITOREO'], true)) $errors[] = 'El canal no es valido.';
+    if ($impact < 1 || $impact > 4 || $urgency < 1 || $urgency > 4) $errors[] = 'Impacto y urgencia deben estar entre 1 y 4.';
+
+    $requesterRows = $requesterId > 0 ? find_by_sql("SELECT id,name,username,correo,area FROM users WHERE id={$requesterId} AND status=1 LIMIT 1") : [];
+    if (!$requesterRows) $errors[] = 'Seleccione un solicitante activo.';
+    if ($type === 'EVENTO') {
+        $eventCategories = find_by_sql("SELECT IdCategoria FROM inc_categorias WHERE Codigo='EVT' AND Activa=1 LIMIT 1");
+        if ($eventCategories) $categoryId = (int)$eventCategories[0]['IdCategoria'];
+    }
+    $categoryRows = $categoryId > 0 ? find_by_sql("SELECT IdCategoria,Nombre FROM inc_categorias WHERE IdCategoria={$categoryId} AND Activa=1 LIMIT 1") : [];
+    if (!$categoryRows) $errors[] = 'Seleccione una categoria activa.';
+    if ($machineId > 0 && !find_by_sql("SELECT IdMaquina FROM maquina WHERE IdMaquina={$machineId} LIMIT 1")) $errors[] = 'El equipo seleccionado no existe.';
+    if ($capacityApplicationId > 0 && !find_by_sql("SELECT IdAplicacion FROM aplicacion WHERE IdAplicacion={$capacityApplicationId} AND EstadoAplicacion='ACTIVA' LIMIT 1")) $errors[] = 'La aplicación seleccionada no existe o no está activa.';
+    if ($capacityServiceId > 0 && !find_by_sql("SELECT IdServicio FROM servicio_ti WHERE IdServicio={$capacityServiceId} AND EstadoServicio='ACTIVO' LIMIT 1")) $errors[] = 'El servicio TI seleccionado no existe o no está activo.';
+    if ($machineId > 0 && !inc_is_agent()) {
+        $assignedRows = find_by_sql("SELECT am.IdMaquina FROM asig_maquina am
+            INNER JOIN (SELECT IdMaquina,MAX(IdAsMaq) IdAsMaq FROM asig_maquina GROUP BY IdMaquina) ultima ON ultima.IdAsMaq=am.IdAsMaq
+            WHERE am.IdMaquina={$machineId} AND am.id={$requesterId} AND am.Estado=1 LIMIT 1");
+        if (!$assignedRows) $errors[] = 'El equipo seleccionado no esta asignado a su usuario.';
+    }
+
+    $assignee = null;
+    if ($assigneeId > 0) {
+        $assigneeRows = find_by_sql("SELECT id,name FROM users WHERE id={$assigneeId} AND status=1 AND es_personal_ti=1 LIMIT 1");
+        if (!$assigneeRows) $errors[] = 'El responsable seleccionado no es personal TI activo.';
+        else $assignee = $assigneeRows[0];
+    }
+
+    $priority = inc_priority($impact, $urgency);
+    $sla = inc_sla_for_priority($priority);
+    if (!$sla) $errors[] = 'No existe una politica SLA activa para la prioridad calculada.';
+    if ($errors) inc_redirect(implode(' ', $errors), 'd');
+
+    $requester = $requesterRows[0];
+    $titleSql = $db->escape($title);
+    $descriptionSql = $db->escape($description);
+    $requesterNameSql = $db->escape((string)$requester['name']);
+    $requesterEmailSql = $db->escape((string)($requester['correo'] ?? ''));
+    $requesterAreaSql = $db->escape((string)($requester['area'] ?? ''));
+    $machineSql = $machineId > 0 ? (string)$machineId : 'NULL';
+    $capacityApplicationSql = $capacityApplicationId > 0 ? (string)$capacityApplicationId : 'NULL';
+    $capacityServiceSql = $capacityServiceId > 0 ? (string)$capacityServiceId : 'NULL';
+    $assigneeSql = $assignee ? (string)(int)$assignee['id'] : 'NULL';
+    $assigneeNameSql = $assignee ? "'".$db->escape((string)$assignee['name'])."'" : 'NULL';
+    $status = 'NUEVO';
+    $now = time();
+    $responseDue = date('Y-m-d H:i:s', $now + (int)$sla['MinutosRespuesta'] * 60);
+    $resolutionDue = date('Y-m-d H:i:s', $now + (int)$sla['MinutosResolucion'] * 60);
+
+    $db->query('START TRANSACTION');
+    $db->query("INSERT INTO inc_tickets
+        (Tipo,Canal,Titulo,Descripcion,IdCategoria,IdMaquina,IdServicio,IdAplicacionCapacidad,IdServicioCapacidad,SolicitanteId,SolicitanteNombre,SolicitanteCorreo,SolicitanteArea,Impacto,Urgencia,Prioridad,IdSLA,Estado,AsignadoA,AsignadoNombre,FechaObjetivoRespuesta,FechaObjetivoResolucion,CreadoPor,ActualizadoPor)
+        VALUES ('{$type}','{$channel}','{$titleSql}','{$descriptionSql}',{$categoryId},{$machineSql},NULL,{$capacityApplicationSql},{$capacityServiceSql},{$requesterId},'{$requesterNameSql}','{$requesterEmailSql}','{$requesterAreaSql}',{$impact},{$urgency},'{$priority}',".(int)$sla['IdSLA'].",'{$status}',{$assigneeSql},{$assigneeNameSql},'{$responseDue}','{$resolutionDue}',{$userId},{$userId})");
+    $ticketId = (int)$db->insert_id();
+    $folio = 'INC-'.date('Y').'-'.str_pad((string)$ticketId, 6, '0', STR_PAD_LEFT);
+    $db->query("UPDATE inc_tickets SET Folio='".$db->escape($folio)."' WHERE IdTicket={$ticketId}");
+    inc_add_timeline($ticketId, 'CREACION', 'Ticket registrado desde el canal '.strtolower($channel).'.', true, null, $status);
+    if ($assignee) inc_add_timeline($ticketId, 'ASIGNACION', 'Asignado a '.(string)$assignee['name'].'.', true, null, $status);
+    $upload = inc_store_uploads($ticketId);
+    if ($upload['added'] > 0) inc_add_timeline($ticketId, 'EVIDENCIA', 'Se adjuntaron '.$upload['added'].' archivo(s) al registrar el ticket.', true);
+    $db->query('COMMIT');
+
+    $createdTicket = inc_find_ticket($ticketId);
+    if ($createdTicket) {
+        inc_notify_support($createdTicket, 'CREACION');
+        inc_notify_requester($createdTicket, 'CREACION');
+    }
+
+    $message = $folio.' fue registrado correctamente con prioridad '.inc_priority_label($priority).'.';
+    if ($upload['errors']) $message .= ' Advertencia: '.implode(' ', $upload['errors']);
+    inc_redirect($message, $upload['errors'] ? 'w' : 's', 'detalle.php?id='.$ticketId);
+}
+
+if ($action === 'guardar_tratamiento') {
+    if (!inc_is_agent() || !tiene_permiso('incidencias', 'editar')) inc_redirect('No tiene permiso para completar la investigación y tratamiento.', 'd');
+    $ticketId = (int)($_POST['IdTicket'] ?? 0);
+    $ticket = inc_find_ticket($ticketId);
+    if (!$ticket) inc_redirect('El ticket solicitado no existe.', 'd');
+    $type = strtoupper(inc_post('TipoTratamiento'));
+    $report = strtoupper(inc_post('InformeTratamiento'));
+    $sac = strtoupper(inc_post('SacGenerada'));
+    $sacCode = inc_post('CodigoSAC');
+    $notes = inc_post('ObservacionesTratamiento');
+    $validTypes = ['CORRECTIVO','PREVENTIVO','CONTENCION','MITIGACION','MEJORA','OTRO'];
+    if (!in_array($type, $validTypes, true)) inc_redirect('Seleccione un tipo de tratamiento válido.', 'd', 'detalle.php?id='.$ticketId);
+    if (!in_array($report, ['SI','NO'], true)) inc_redirect('Indique si existe informe de tratamiento.', 'd', 'detalle.php?id='.$ticketId);
+    if (!in_array($sac, ['SI','NO','NO_APLICA'], true)) inc_redirect('Seleccione una opción válida para SAC generada.', 'd', 'detalle.php?id='.$ticketId);
+    if ($sac === 'SI' && $sacCode === '') inc_redirect('Ingrese el código SAC cuando se indica que fue generada.', 'd', 'detalle.php?id='.$ticketId);
+    if ($sac !== 'SI') $sacCode = '';
+    $db->query("UPDATE inc_tickets SET TipoTratamiento='".$db->escape($type)."',InformeTratamiento='".$db->escape($report)."',SacGenerada='".$db->escape($sac)."',CodigoSAC='".$db->escape($sacCode)."',ObservacionesTratamiento='".$db->escape($notes)."',TratamientoActualizadoPor={$userId},TratamientoActualizadoNombre='".$db->escape($userName)."',FechaTratamiento=NOW(),ActualizadoPor={$userId} WHERE IdTicket={$ticketId}");
+    inc_add_timeline($ticketId, 'INVESTIGACION_TRATAMIENTO', 'Ficha de investigación y tratamiento actualizada por '.$userName.'.', false);
+    inc_redirect('La ficha de investigación y tratamiento fue guardada.', 's', 'detalle.php?id='.$ticketId);
+}
+if ($action === 'agregar_seguimiento') {
+    $ticketId = (int)($_POST['IdTicket'] ?? 0);
+    $ticket = inc_find_ticket($ticketId);
+    if (!$ticket || !inc_can_view_ticket($ticket)) inc_redirect('El ticket no existe o no puede consultarlo.', 'd');
+    if (in_array((string)$ticket['Estado'], ['RESUELTO','CERRADO','CANCELADO'], true)) inc_redirect('El ticket esta finalizado. Solo permite confirmar la solucion o calificar la atencion.', 'w', 'detalle.php?id='.$ticketId);
+    $comment = inc_post('Comentario');
+    $internal = inc_is_agent() && !empty($_POST['EsInterno']);
+    $hasFiles = inc_has_uploaded_files();
+    if ($comment === '' && !$hasFiles) inc_redirect('Escriba un comentario o adjunte una evidencia.', 'd', 'detalle.php?id='.$ticketId);
+    if ($comment === '') $comment = 'Se agregaron nuevas evidencias al ticket.';
+
+    $trackingId = inc_add_timeline($ticketId, $internal ? 'NOTA_INTERNA' : 'COMENTARIO', $comment, !$internal);
+    $upload = inc_store_uploads($ticketId, 'adjuntos', $trackingId);
+    if (inc_is_agent() && empty($ticket['FechaPrimeraRespuesta'])) {
+        $db->query("UPDATE inc_tickets SET FechaPrimeraRespuesta=NOW(),ActualizadoPor={$userId} WHERE IdTicket={$ticketId}");
+    } else {
+        $db->query("UPDATE inc_tickets SET ActualizadoPor={$userId} WHERE IdTicket={$ticketId}");
+    }
+    if (!$internal && !inc_is_agent() && (string)$ticket['Estado'] === 'PENDIENTE_USUARIO') {
+        $pauseMinutes = (int)$ticket['MinutosPausa'];
+        $resolutionDue = (string)$ticket['FechaObjetivoResolucion'];
+        if (!empty($ticket['PausaSLAInicio'])) {
+            $elapsed = max(0, (int)floor((time() - strtotime((string)$ticket['PausaSLAInicio'])) / 60));
+            $pauseMinutes += $elapsed;
+            if ($resolutionDue !== '') $resolutionDue = date('Y-m-d H:i:s', strtotime($resolutionDue) + $elapsed * 60);
+        }
+        $db->query("UPDATE inc_tickets SET Estado='EN_PROGRESO',PausaSLAInicio=NULL,MinutosPausa={$pauseMinutes},FechaObjetivoResolucion='".$db->escape($resolutionDue)."',FechaLimiteRespuesta=NULL,ActualizadoPor={$userId} WHERE IdTicket={$ticketId}");
+        inc_add_timeline($ticketId, 'REAPERTURA', 'El solicitante respondio y el ticket regreso a En progreso.', true, 'PENDIENTE_USUARIO', 'EN_PROGRESO');
+    }
+    if (!$internal) {
+        if (inc_is_agent()) inc_notify_requester($ticket, 'RESPUESTA_TI', $comment);
+        else inc_notify_support($ticket, 'RESPUESTA_USUARIO', $comment);
+    }
+    $message = $internal ? 'Nota interna guardada.' : 'Seguimiento agregado al ticket.';
+    if ($upload['added']) $message .= ' Se adjuntaron '.$upload['added'].' archivo(s).';
+    if ($upload['errors']) $message .= ' Advertencia: '.implode(' ', $upload['errors']);
+    inc_redirect($message, $upload['errors'] ? 'w' : 's', 'detalle.php?id='.$ticketId.'#actividad');
+}
+
+if ($action === 'actualizar_ticket') {
+    if (!inc_is_agent()) inc_redirect('No tiene permiso para gestionar tickets.', 'd');
+    $ticketId = (int)($_POST['IdTicket'] ?? 0);
+    $ticket = inc_find_ticket($ticketId);
+    if (!$ticket) inc_redirect('El ticket solicitado no existe.', 'd');
+
+    $status = strtoupper(inc_post('Estado', (string)$ticket['Estado']));
+    $categoryId = (int)($_POST['IdCategoria'] ?? $ticket['IdCategoria']);
+    $impact = (int)($_POST['Impacto'] ?? $ticket['Impacto']);
+    $urgency = (int)($_POST['Urgencia'] ?? $ticket['Urgencia']);
+    $assigneeId = (int)($_POST['AsignadoA'] ?? 0);
+    $resolution = inc_post('Resolucion');
+    $rootCause = inc_post('CausaRaiz');
+    $closureCode = strtoupper(inc_post('CodigoCierre'));
+    $managementComment = inc_post('ComentarioGestion');
+    $errors = [];
+    $validStates = ['NUEVO','EN_PROGRESO','PENDIENTE_USUARIO','PENDIENTE_TERCERO','RESUELTO','CERRADO','CANCELADO'];
+    if (!in_array($status, $validStates, true)) $errors[] = 'El estado seleccionado no es valido.';
+    if ($impact < 1 || $impact > 4 || $urgency < 1 || $urgency > 4) $errors[] = 'Impacto y urgencia deben estar entre 1 y 4.';
+    if (!find_by_sql("SELECT IdCategoria FROM inc_categorias WHERE IdCategoria={$categoryId} LIMIT 1")) $errors[] = 'La categoria no existe.';
+    if (in_array($status, ['RESUELTO','CERRADO'], true) && mb_strlen($resolution) < 10) $errors[] = 'Documente la solucion con al menos 10 caracteres antes de resolver o cerrar.';
+    if (in_array($status, ['RESUELTO','CERRADO'], true) && $closureCode === '') $errors[] = 'Seleccione un codigo de cierre.';
+
+    $assignee = null;
+    if ($assigneeId > 0) {
+        $rows = find_by_sql("SELECT id,name FROM users WHERE id={$assigneeId} AND status=1 AND es_personal_ti=1 LIMIT 1");
+        if (!$rows) $errors[] = 'El responsable seleccionado no es personal TI activo.';
+        else $assignee = $rows[0];
+    }
+    if (in_array($status, ['EN_PROGRESO','RESUELTO','CERRADO'], true) && !$assignee) $errors[] = 'Asigne un responsable TI para usar ese estado.';
+
+    $priority = inc_priority($impact, $urgency);
+    $sla = inc_sla_for_priority($priority);
+    if (!$sla) $errors[] = 'No existe una politica SLA activa para la prioridad calculada.';
+    if ($errors) inc_redirect(implode(' ', $errors), 'd', 'detalle.php?id='.$ticketId);
+
+    $oldStatus = (string)$ticket['Estado'];
+    $oldAssignee = (int)($ticket['AsignadoA'] ?? 0);
+    $nowSql = date('Y-m-d H:i:s');
+    $pauseMinutes = (int)$ticket['MinutosPausa'];
+    $pauseStart = $ticket['PausaSLAInicio'] ?: null;
+    $pausedStates = ['PENDIENTE_USUARIO', 'PENDIENTE_TERCERO'];
+    $enteringPause = in_array($status, $pausedStates, true) && !in_array($oldStatus, $pausedStates, true);
+    $leavingPause = !in_array($status, $pausedStates, true) && in_array($oldStatus, $pausedStates, true);
+    if ($enteringPause) $pauseStart = $nowSql;
+    if ($leavingPause && $pauseStart) {
+        $elapsed = max(0, (int)floor((strtotime($nowSql) - strtotime($pauseStart)) / 60));
+        $pauseMinutes += $elapsed;
+        $pauseStart = null;
+    }
+
+    $priorityChanged = $priority !== (string)$ticket['Prioridad'];
+    if ($priorityChanged) {
+        $registeredAt = strtotime((string)$ticket['FechaRegistro']);
+        $responseDue = date('Y-m-d H:i:s', $registeredAt + (int)$sla['MinutosRespuesta'] * 60);
+        $resolutionDue = date('Y-m-d H:i:s', $registeredAt + ((int)$sla['MinutosResolucion'] + $pauseMinutes) * 60);
+    } else {
+        $responseDue = (string)$ticket['FechaObjetivoRespuesta'];
+        $resolutionDue = (string)$ticket['FechaObjetivoResolucion'];
+        if ($leavingPause && isset($elapsed) && $resolutionDue) $resolutionDue = date('Y-m-d H:i:s', strtotime($resolutionDue) + $elapsed * 60);
+    }
+
+    $firstResponse = $ticket['FechaPrimeraRespuesta'] ?: $nowSql;
+    $resolutionDate = $ticket['FechaResolucion'] ?: null;
+    $closureDate = $ticket['FechaCierre'] ?: null;
+    $reopens = (int)$ticket['Reaperturas'];
+    if (in_array($status, ['RESUELTO','CERRADO'], true) && !$resolutionDate) $resolutionDate = $nowSql;
+    if (in_array($status, ['CERRADO','CANCELADO'], true) && !$closureDate) $closureDate = $nowSql;
+    if (in_array($oldStatus, ['RESUELTO','CERRADO'], true) && !in_array($status, ['RESUELTO','CERRADO','CANCELADO'], true)) {
+        $reopens++;
+        $resolutionDate = null;
+        $closureDate = null;
+    }
+
+    $assigneeSql = $assignee ? (string)(int)$assignee['id'] : 'NULL';
+    $assigneeNameSql = $assignee ? "'".$db->escape((string)$assignee['name'])."'" : 'NULL';
+    $pauseStartSql = $pauseStart ? "'".$db->escape($pauseStart)."'" : 'NULL';
+    $resolutionDateSql = $resolutionDate ? "'".$db->escape($resolutionDate)."'" : 'NULL';
+    $closureDateSql = $closureDate ? "'".$db->escape($closureDate)."'" : 'NULL';
+    $resolutionSql = $db->escape($resolution);
+    $rootCauseSql = $db->escape($rootCause);
+    $closureCodeSql = $db->escape($closureCode);
+
+    $db->query("UPDATE inc_tickets SET IdCategoria={$categoryId},Impacto={$impact},Urgencia={$urgency},Prioridad='{$priority}',IdSLA=".(int)$sla['IdSLA'].",Estado='{$status}',AsignadoA={$assigneeSql},AsignadoNombre={$assigneeNameSql},FechaPrimeraRespuesta='{$firstResponse}',FechaObjetivoRespuesta='".$db->escape($responseDue)."',FechaObjetivoResolucion='".$db->escape($resolutionDue)."',FechaResolucion={$resolutionDateSql},FechaCierre={$closureDateSql},PausaSLAInicio={$pauseStartSql},MinutosPausa={$pauseMinutes},Resolucion='{$resolutionSql}',CausaRaiz='{$rootCauseSql}',CodigoCierre='{$closureCodeSql}',Reaperturas={$reopens},ActualizadoPor={$userId} WHERE IdTicket={$ticketId}");
+
+    if ($status === 'PENDIENTE_USUARIO' && $oldStatus !== 'PENDIENTE_USUARIO') {
+        $db->query("UPDATE inc_tickets SET LlamadosUsuario=0,FechaUltimoLlamado=NULL,FechaLimiteRespuesta=NULL WHERE IdTicket={$ticketId}");
+    } elseif ($status !== 'PENDIENTE_USUARIO') {
+        $db->query("UPDATE inc_tickets SET FechaLimiteRespuesta=NULL WHERE IdTicket={$ticketId}");
+    }
+
+    if ($oldAssignee !== $assigneeId) {
+        $assignedText = $assignee ? 'Ticket asignado a '.(string)$assignee['name'].'.' : 'Se retiro la asignacion del ticket.';
+        inc_add_timeline($ticketId, 'ASIGNACION', $assignedText, true, $oldStatus, $status);
+    }
+    if ($oldStatus !== $status) {
+        $text = 'Estado cambiado de '.inc_status_label($oldStatus).' a '.inc_status_label($status).'.';
+        if ($managementComment !== '') $text .= ' '.$managementComment;
+        inc_add_timeline($ticketId, in_array($status, ['RESUELTO','CERRADO'], true) ? 'RESOLUCION' : ($reopens > (int)$ticket['Reaperturas'] ? 'REAPERTURA' : 'CAMBIO_ESTADO'), $text, true, $oldStatus, $status);
+    } elseif ($managementComment !== '') {
+        inc_add_timeline($ticketId, 'GESTION', $managementComment, false);
+    }
+    if ($priorityChanged) inc_add_timeline($ticketId, 'PRIORIZACION', 'Prioridad recalculada a '.inc_priority_label($priority).' por impacto '.$impact.' y urgencia '.$urgency.'.', false);
+
+    if ($oldStatus !== $status) {
+        $updatedTicket = inc_find_ticket($ticketId);
+        if ($updatedTicket) inc_notify_requester($updatedTicket, 'CAMBIO_ESTADO', $managementComment, in_array($status, ['RESUELTO','CERRADO'], true) ? $resolution : '');
+    }
+
+    inc_redirect('Ticket actualizado correctamente.', 's', 'detalle.php?id='.$ticketId);
+}
+
+if ($action === 'registrar_llamado') {
+    if (!inc_is_agent()) inc_redirect('No tiene permiso para registrar llamados.', 'd');
+    $ticketId = (int)($_POST['IdTicket'] ?? 0);
+    $ticket = inc_find_ticket($ticketId);
+    if (!$ticket || (string)$ticket['Estado'] !== 'PENDIENTE_USUARIO') inc_redirect('El ticket no esta pendiente de respuesta del usuario.', 'd', 'detalle.php?id='.$ticketId);
+    $call = min(3, (int)($ticket['LlamadosUsuario'] ?? 0) + 1);
+    $labels = [1=>'PRIMER LLAMADO', 2=>'SEGUNDO LLAMADO', 3=>'TERCER LLAMADO'];
+    $messages = [
+        1=>'Agradecemos responder la informacion solicitada para continuar con la atencion.',
+        2=>'Seguimos pendientes de su respuesta para poder continuar y resolver el ticket.',
+        3=>'Favor de indicar si presenta alguna duda. De no recibir respuesta en las proximas 48 horas, el ticket se cerrara por falta de respuesta y debera generar uno nuevo si el problema continua.'
+    ];
+    $message = '['.$labels[$call].'] '.$messages[$call];
+    $deadlineSql = $call === 3 ? 'DATE_ADD(NOW(), INTERVAL 48 HOUR)' : 'NULL';
+    $db->query("UPDATE inc_tickets SET LlamadosUsuario={$call},FechaUltimoLlamado=NOW(),FechaLimiteRespuesta={$deadlineSql},ActualizadoPor={$userId} WHERE IdTicket={$ticketId}");
+    inc_add_timeline($ticketId, 'LLAMADO_USUARIO', $message, true, 'PENDIENTE_USUARIO', 'PENDIENTE_USUARIO');
+    $updated = inc_find_ticket($ticketId);
+    if ($updated) inc_notify_requester($updated, 'LLAMADO_USUARIO', $message);
+    inc_redirect('Llamado '.$call.' de 3 registrado y notificado.', 's', 'detalle.php?id='.$ticketId);
+}
+
+if ($action === 'cerrar_sin_respuesta') {
+    if (!inc_is_agent()) inc_redirect('No tiene permiso para cerrar el ticket.', 'd');
+    $ticketId = (int)($_POST['IdTicket'] ?? 0);
+    $ticket = inc_find_ticket($ticketId);
+    if (!$ticket || (string)$ticket['Estado'] !== 'PENDIENTE_USUARIO' || (int)($ticket['LlamadosUsuario'] ?? 0) < 3 || empty($ticket['FechaLimiteRespuesta']) || strtotime((string)$ticket['FechaLimiteRespuesta']) > time()) inc_redirect('Aun no se cumplen los tres llamados y las 48 horas de espera.', 'w', 'detalle.php?id='.$ticketId);
+    $resolution = trim((string)$ticket['Resolucion']);
+    if ($resolution === '') $resolution = 'Ticket cerrado por falta de respuesta del solicitante despues de tres llamados.';
+    $db->query("UPDATE inc_tickets SET Estado='CERRADO',FechaCierre=NOW(),PausaSLAInicio=NULL,Resolucion='".$db->escape($resolution)."',CodigoCierre='SIN_RESPUESTA_USUARIO',ActualizadoPor={$userId} WHERE IdTicket={$ticketId}");
+    inc_add_timeline($ticketId, 'CIERRE_SIN_RESPUESTA', 'Ticket cerrado luego de tres llamados y 48 horas sin respuesta.', true, 'PENDIENTE_USUARIO', 'CERRADO');
+    $updated = inc_find_ticket($ticketId);
+    if ($updated) inc_notify_requester($updated, 'CAMBIO_ESTADO', 'Cierre por falta de respuesta despues de tres llamados.', $resolution);
+    inc_redirect('Ticket cerrado con trazabilidad por falta de respuesta.', 's', 'detalle.php?id='.$ticketId);
+}
+
+if ($action === 'confirmar_resolucion') {
+    $ticketId = (int)($_POST['IdTicket'] ?? 0);
+    $ticket = inc_find_ticket($ticketId);
+    if (!$ticket || (int)$ticket['SolicitanteId'] !== $userId || (string)$ticket['Estado'] !== 'RESUELTO') inc_redirect('No puede confirmar la solucion de este ticket.', 'd', 'detalle.php?id='.$ticketId);
+    $decision = strtoupper(inc_post('Decision'));
+    $comment = inc_post('Comentario');
+    if ($decision === 'RESUELTO') {
+        $db->query("UPDATE inc_tickets SET Estado='CERRADO',FechaCierre=NOW(),ConfirmacionUsuario='RESUELTO',FechaConfirmacionUsuario=NOW(),CodigoCierre='CONFIRMADO_USUARIO',ActualizadoPor={$userId} WHERE IdTicket={$ticketId}");
+        inc_add_timeline($ticketId, 'CONFIRMACION_USUARIO', 'El solicitante confirmo que la solucion fue satisfactoria.', true, 'RESUELTO', 'CERRADO');
+        inc_redirect('Gracias. El ticket quedo cerrado y ya puede calificar la atencion.', 's', 'detalle.php?id='.$ticketId);
+    }
+    if ($decision !== 'NO_RESUELTO' || mb_strlen($comment) < 10) inc_redirect('Explique en al menos 10 caracteres por que el problema continua.', 'd', 'detalle.php?id='.$ticketId);
+    $db->query("UPDATE inc_tickets SET Estado='EN_PROGRESO',FechaResolucion=NULL,FechaCierre=NULL,ConfirmacionUsuario='NO_RESUELTO',FechaConfirmacionUsuario=NOW(),CodigoCierre=NULL,Reaperturas=Reaperturas+1,ActualizadoPor={$userId} WHERE IdTicket={$ticketId}");
+    inc_add_timeline($ticketId, 'REAPERTURA', 'El solicitante indico que el problema continua: '.$comment, true, 'RESUELTO', 'EN_PROGRESO');
+    $updated = inc_find_ticket($ticketId);
+    if ($updated) inc_notify_support($updated, 'REAPERTURA', $comment);
+    inc_redirect('El ticket fue reabierto y Soporte TI fue notificado.', 's', 'detalle.php?id='.$ticketId);
+}
+if ($action === 'registrar_satisfaccion') {
+    $ticketId = (int)($_POST['IdTicket'] ?? 0);
+    $ticket = inc_find_ticket($ticketId);
+    if (!$ticket || !inc_can_view_ticket($ticket)) inc_redirect('El ticket no existe o no puede consultarlo.', 'd');
+    if ((string)$ticket['Estado'] !== 'CERRADO') inc_redirect('La satisfaccion se registra cuando el ticket esta cerrado.', 'd', 'detalle.php?id='.$ticketId);
+    $score = (int)($_POST['Satisfaccion'] ?? 0);
+    $comment = inc_post('ComentarioSatisfaccion');
+    if ($score < 1 || $score > 5) inc_redirect('Seleccione una calificacion de 1 a 5.', 'd', 'detalle.php?id='.$ticketId);
+    $db->query("UPDATE inc_tickets SET Satisfaccion={$score},ComentarioSatisfaccion='".$db->escape($comment)."',ActualizadoPor={$userId} WHERE IdTicket={$ticketId}");
+    inc_add_timeline($ticketId, 'SATISFACCION', 'El solicitante califico la atencion con '.$score.' de 5.', true);
+    inc_redirect('Gracias. La calificacion quedo registrada.', 's', 'detalle.php?id='.$ticketId);
+}
+
+if ($action === 'guardar_categoria') {
+    if (!tiene_permiso('incidencias', 'editar')) inc_redirect('No tiene permiso para configurar categorias.', 'd', 'configuracion.php');
+    $id = (int)($_POST['IdCategoria'] ?? 0);
+    $code = strtoupper(preg_replace('/[^A-Z0-9_-]/', '', inc_post('Codigo')));
+    $name = inc_post('Nombre');
+    $description = inc_post('Descripcion');
+    $icon = inc_post('Icono', 'fas fa-ticket-alt');
+    $color = inc_post('Color', '#128698');
+    $active = !empty($_POST['Activa']) ? 1 : 0;
+    if ($code === '' || mb_strlen($name) < 3) inc_redirect('Complete el codigo y nombre de la categoria.', 'd', 'configuracion.php');
+    if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $color)) $color = '#128698';
+    $duplicate = find_by_sql("SELECT IdCategoria FROM inc_categorias WHERE Codigo='".$db->escape($code)."' AND IdCategoria<>{$id} LIMIT 1");
+    if ($duplicate) inc_redirect('Ya existe una categoria con ese codigo.', 'd', 'configuracion.php');
+    $values = [
+        'name' => $db->escape($name), 'description' => $db->escape($description),
+        'icon' => $db->escape($icon), 'color' => $db->escape($color),
+    ];
+    if ($id > 0) {
+        $db->query("UPDATE inc_categorias SET Codigo='".$db->escape($code)."',Nombre='{$values['name']}',Descripcion='{$values['description']}',Icono='{$values['icon']}',Color='{$values['color']}',Activa={$active} WHERE IdCategoria={$id}");
+    } else {
+        $db->query("INSERT INTO inc_categorias (Codigo,Nombre,Descripcion,Icono,Color,Activa) VALUES ('".$db->escape($code)."','{$values['name']}','{$values['description']}','{$values['icon']}','{$values['color']}',{$active})");
+    }
+    inc_redirect($id > 0 ? 'Categoria actualizada.' : 'Categoria creada.', 's', 'configuracion.php');
+}
+
+if ($action === 'guardar_sla') {
+    if (!tiene_permiso('incidencias', 'editar')) inc_redirect('No tiene permiso para configurar SLA.', 'd', 'configuracion.php');
+    $id = (int)($_POST['IdSLA'] ?? 0);
+    $name = inc_post('Nombre');
+    $priority = strtoupper(inc_post('Prioridad'));
+    $response = (int)($_POST['MinutosRespuesta'] ?? 0);
+    $resolutionTime = (int)($_POST['MinutosResolucion'] ?? 0);
+    $description = inc_post('Descripcion');
+    $active = !empty($_POST['Activa']) ? 1 : 0;
+    if (!in_array($priority, ['CRITICA','ALTA','MEDIA','BAJA'], true) || $name === '' || $response <= 0 || $resolutionTime < $response) {
+        inc_redirect('Revise nombre, prioridad y tiempos. La resolucion debe ser igual o mayor que la respuesta.', 'd', 'configuracion.php');
+    }
+    $duplicate = find_by_sql("SELECT IdSLA FROM inc_sla_politicas WHERE Prioridad='".$db->escape($priority)."' AND IdSLA<>{$id} LIMIT 1");
+    if ($duplicate) inc_redirect('Ya existe una politica para esa prioridad.', 'd', 'configuracion.php');
+    $nameSql = $db->escape($name);
+    $descriptionSql = $db->escape($description);
+    if ($id > 0) {
+        $db->query("UPDATE inc_sla_politicas SET Nombre='{$nameSql}',Prioridad='{$priority}',MinutosRespuesta={$response},MinutosResolucion={$resolutionTime},Descripcion='{$descriptionSql}',Activa={$active} WHERE IdSLA={$id}");
+    } else {
+        $db->query("INSERT INTO inc_sla_politicas (Nombre,Prioridad,MinutosRespuesta,MinutosResolucion,Descripcion,Activa) VALUES ('{$nameSql}','{$priority}',{$response},{$resolutionTime},'{$descriptionSql}',{$active})");
+    }
+    inc_redirect($id > 0 ? 'Politica SLA actualizada.' : 'Politica SLA creada.', 's', 'configuracion.php');
+}
+
+inc_redirect('La accion solicitada no es valida.', 'd');

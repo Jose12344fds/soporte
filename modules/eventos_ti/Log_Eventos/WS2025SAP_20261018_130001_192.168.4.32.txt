@@ -1,0 +1,601 @@
+﻿{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:54:12",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Protección de software entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:53:42",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Protección de software entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:34:11",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de implementación de AppX (AppXSVC) entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:33:07",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:32:57",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Protección de software entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:32:27",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Protección de software entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:30:06",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:29:11",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de implementación de AppX (AppXSVC) entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:12:07",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de implementación de AppX (AppXSVC) entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:09:06",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Instalador de módulos de Windows entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:07:38",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Protección de software entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:07:02",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Instalador de módulos de Windows entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:07:01",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de implementación de AppX (AppXSVC) entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:07:01",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Protección de software entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:03:08",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio WaaSMedicSvc entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:02:36",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Protección de software entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:02:06",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Protección de software entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:02:06",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio WaaSMedicSvc entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:01:35",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:00:04",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 12:00:01",
+  "CodigoEvento": "6013",
+  "Severidad": "INFORMACION",
+  "Proveedor": "EventLog",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El tiempo límite del sistema es de 772340 segundos."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 11:34:11",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de implementación de AppX (AppXSVC) entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 11:33:07",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 11:30:06",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 11:29:11",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de implementación de AppX (AppXSVC) entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 11:12:31",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Protección de software entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 11:12:01",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Protección de software entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 11:01:36",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 11:00:05",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:41:53",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Brave Update Servicio (brave) entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:41:53",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Brave Update Servicio (brave) entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:40:06",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Host de sistema de diagnóstico entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:35:13",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de implementación de AppX (AppXSVC) entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:33:07",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:30:06",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:29:20",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Windows Update entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:24:05",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Optimización de distribución entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:24:03",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de licencia de cliente (ClipSVC) entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:22:10",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:21:11",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Ayudante para el inicio de sesión de cuenta Microsoft entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:19:11",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Host de sistema de diagnóstico entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:19:11",
+  "CodigoEvento": "44",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-WindowsUpdateClient",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Windows Update comenzó a descargar una actualización."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:19:11",
+  "CodigoEvento": "44",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-WindowsUpdateClient",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Windows Update comenzó a descargar una actualización."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:19:11",
+  "CodigoEvento": "44",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-WindowsUpdateClient",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Windows Update comenzó a descargar una actualización."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:19:11",
+  "CodigoEvento": "44",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-WindowsUpdateClient",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Windows Update comenzó a descargar una actualización."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:19:10",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio WaaSMedicSvc entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:19:07",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de configuración de red entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:19:06",
+  "CodigoEvento": "44",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-WindowsUpdateClient",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Windows Update comenzó a descargar una actualización."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:19:06",
+  "CodigoEvento": "44",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-WindowsUpdateClient",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Windows Update comenzó a descargar una actualización."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-10-18 10:19:06",
+  "CodigoEvento": "44",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-WindowsUpdateClient",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Windows Update comenzó a descargar una actualización."
+}
+
+

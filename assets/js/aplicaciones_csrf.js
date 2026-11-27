@@ -1,0 +1,26 @@
+(function(){
+'use strict';
+function forms(){return Array.from(document.querySelectorAll('.app-modal form[method="post"]'));}
+function tokenValue(){return (document.querySelector('meta[name="csrf-token"]')||{}).content||window.CSRF_TOKEN||'';}
+function sync(form,token){token=token||tokenValue();if(!token)return;var field=form.querySelector('input[name="_csrf"]');if(!field){field=document.createElement('input');field.type='hidden';field.name='_csrf';form.appendChild(field);}field.value=token;field.defaultValue=token;}
+function hideLoader(){document.querySelectorAll('.preloader').forEach(function(el){el.style.setProperty('display','none','important');el.setAttribute('aria-hidden','true');});}
+function all(){forms().forEach(function(f){sync(f);});hideLoader();}
+// La apertura de la ficha no depende de la inicialización de DataTables.
+var modalFocus=null;
+function showModal(modal){modalFocus=document.activeElement;if(window.jQuery&&jQuery.fn.modal){jQuery(modal).modal('show');return;}modal.style.display='block';modal.classList.add('show');modal.setAttribute('aria-modal','true');modal.setAttribute('role','dialog');document.body.classList.add('modal-open');var backdrop=document.createElement('div');backdrop.className='modal-backdrop fade show app-native-backdrop';document.body.appendChild(backdrop);modal.querySelector('input:not([type=hidden]),select,textarea,button').focus();}
+function hideModal(modal){if(window.jQuery&&jQuery.fn.modal){jQuery(modal).modal('hide');return;}modal.style.display='none';modal.classList.remove('show');modal.removeAttribute('aria-modal');document.querySelectorAll('.app-native-backdrop').forEach(function(b){b.remove();});document.body.classList.remove('modal-open');if(modalFocus)modalFocus.focus();}
+function fill(form,record){Object.keys(record).forEach(function(key){if(/^\d+$/.test(key)||['_csrf','csrf_token','action'].indexOf(key)>=0)return;var field=form.elements.namedItem(key);if(!field||record[key]===null)return;if(field.type==='checkbox')field.checked=String(record[key])==='1';else field.value=record[key];});sync(form);}
+document.addEventListener('click',function(e){var button=e.target.closest('.btn-edit-app,.btn-edit-contract');if(button){e.preventDefault();e.stopImmediatePropagation();var modal=document.getElementById(button.classList.contains('btn-edit-app')?'modalApp':'modalContract'),form=modal.querySelector('form');try{var record=JSON.parse(button.getAttribute('data-record'));form.reset();fill(form,record);if(modal.id==='modalContract'){modal.querySelector('.modal-title').textContent='Editar contrato';modal.querySelector('.contract-save-label').textContent='Guardar cambios';}showModal(modal);if(modal.id==='modalContract')document.dispatchEvent(new CustomEvent('application-contract-opened'));}catch(err){showError(form,'No se pudo preparar la ficha de edición. Recarga la página.');}return;}
+ var dismiss=e.target.closest('.app-modal [data-dismiss=modal]');if(dismiss){e.preventDefault();e.stopImmediatePropagation();hideModal(dismiss.closest('.app-modal'));}
+},true);
+setTimeout(hideLoader,1200);window.addEventListener('load',hideLoader);
+function showError(form,text){var box=form.querySelector('.app-csrf-error');if(!box){box=document.createElement('div');box.className='alert alert-danger app-csrf-error';box.setAttribute('role','alert');(form.querySelector('.modal-body')||form).prepend(box);}box.textContent=text;box.hidden=false;}
+document.addEventListener('submit',function(e){var form=e.target;if(!form.matches('.app-modal form[method="post"]')||form.hasAttribute('data-activos-api'))return;e.preventDefault();if(form.dataset.csrfSending==='1')return;form.dataset.csrfSending='1';var buttons=Array.from(form.querySelectorAll('button[type="submit"],button:not([type]),input[type="submit"]')),states=buttons.map(function(b){return b.disabled;});buttons.forEach(function(b){b.disabled=true;});var error=form.querySelector('.app-csrf-error');if(error)error.hidden=true;
+fetch('../../api/mantenimientos/csrf.php',{method:'GET',cache:'no-store',credentials:'same-origin',headers:{Accept:'application/json'}})
+ .then(function(r){if(!r.ok)throw Error(r.status===401?'La sesión ha vencido. Inicia sesión nuevamente antes de guardar.':'No se pudo validar la sesión. Intenta guardar nuevamente.');return r.json();})
+ .then(function(d){if(!d.success||typeof d.token!=='string'||!d.token)throw Error(d.error||'No se pudo obtener el token de seguridad.');window.CSRF_TOKEN=d.token;var meta=document.querySelector('meta[name="csrf-token"]');if(meta)meta.content=d.token;sync(form,d.token);HTMLFormElement.prototype.submit.call(form);})
+ .catch(function(err){form.dataset.csrfSending='0';buttons.forEach(function(b,i){b.disabled=states[i];});showError(form,err.message||'No se pudo guardar. Reintenta la operación.');});
+},true);
+document.addEventListener('reset',function(e){var form=e.target;if(form.matches('.app-modal form'))queueMicrotask(function(){sync(form);});},true);
+window.addEventListener('pageshow',all);if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',all);else all();
+})();

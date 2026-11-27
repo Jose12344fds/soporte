@@ -1,0 +1,1003 @@
+<?php
+/**
+ * API: importacion masiva de programacion de mantenimiento a @TAMA_PROGMANT.
+ */
+ob_start();
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/import_prog.log');
+set_time_limit(300);
+header('Content-Type: application/json; charset=utf-8');
+
+require_once __DIR__ . '/conexion_hana.php';
+require_once dirname(dirname(__DIR__)) . '/includes/load.php';
+
+if (!$session->isUserLoggedIn(false)) {
+    api_out(['success' => false, 'error' => 'No autorizado'], 401);
+}
+
+$fields = [
+    'Code' => ['required' => false],
+    'Name' => ['required' => true],
+    'U_ItemCode' => ['required' => true],
+    'U_TipoMant' => ['required' => true],
+    'U_FechaProg' => ['required' => true, 'date' => true],
+    'U_FechaInicioPlan' => ['required' => false, 'date' => true],
+    'U_FechaFinPlan' => ['required' => false, 'date' => true],
+    'U_Frecuencia' => ['required' => true],
+    'U_GeneraAuto' => ['required' => false],
+    'U_AnioBase' => ['required' => false],
+    'U_TipoPeriodo' => ['required' => false],
+    'U_Activo' => ['required' => false],
+    'U_Estado' => ['required' => false],
+    'U_Observacion' => ['required' => false],
+    'U_Modalidad' => ['required' => false],
+];
+
+$aliases = [
+    'code' => 'Code',
+    'codigo' => 'Code',
+    'codigo_programacion' => 'Code',
+    'pm' => 'Code',
+    'name' => 'Name',
+    'descripcion' => 'Name',
+    'programacion' => 'Name',
+    'u_itemcode' => 'U_ItemCode',
+    'itemcode' => 'U_ItemCode',
+    'equipo' => 'U_ItemCode',
+    'codigo_equipo' => 'U_ItemCode',
+    'u_tipomant' => 'U_TipoMant',
+    'tipomant' => 'U_TipoMant',
+    'tipo_mant' => 'U_TipoMant',
+    'tipo_mantenimiento' => 'U_TipoMant',
+    'u_fechaprog' => 'U_FechaProg',
+    'fechaprog' => 'U_FechaProg',
+    'fecha' => 'U_FechaProg',
+    'fecha_programada' => 'U_FechaProg',
+    'u_fechainicioplan' => 'U_FechaInicioPlan',
+    'fechainicioplan' => 'U_FechaInicioPlan',
+    'fecha_inicio_plan' => 'U_FechaInicioPlan',
+    'inicio_plan' => 'U_FechaInicioPlan',
+    'u_fechafinplan' => 'U_FechaFinPlan',
+    'fechafinplan' => 'U_FechaFinPlan',
+    'fecha_fin_plan' => 'U_FechaFinPlan',
+    'fin_plan' => 'U_FechaFinPlan',
+    'u_frecuencia' => 'U_Frecuencia',
+    'frecuencia' => 'U_Frecuencia',
+    'u_generaauto' => 'U_GeneraAuto',
+    'generaauto' => 'U_GeneraAuto',
+    'genera_auto' => 'U_GeneraAuto',
+    'u_aniobase' => 'U_AnioBase',
+    'aniobase' => 'U_AnioBase',
+    'anio_base' => 'U_AnioBase',
+    'u_tipoperiodo' => 'U_TipoPeriodo',
+    'tipoperiodo' => 'U_TipoPeriodo',
+    'tipo_periodo' => 'U_TipoPeriodo',
+    'u_activo' => 'U_Activo',
+    'activo' => 'U_Activo',
+    'u_estado' => 'U_Estado',
+    'estado' => 'U_Estado',
+    'u_observacion' => 'U_Observacion',
+    'observacion' => 'U_Observacion',
+    'observaciones' => 'U_Observacion',
+    'u_modalidad' => 'U_Modalidad',
+    'modalidad' => 'U_Modalidad',
+];
+
+function api_out(array $data, int $code = 200): void {
+    while (ob_get_level()) { ob_end_clean(); }
+    http_response_code($code);
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
+
+function vtrim($v): string {
+    return trim((string)($v ?? ''));
+}
+
+function norm_key($v): string {
+    $s = vtrim($v);
+    $s = function_exists('mb_strtolower') ? mb_strtolower($s, 'UTF-8') : strtolower($s);
+    $s = strtr($s, [
+        'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ñ' => 'n',
+        'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'Ñ' => 'n',
+    ]);
+    $s = preg_replace('/[^a-z0-9]+/', '_', $s);
+    return trim($s, '_');
+}
+
+function sql_q($v): string {
+    $s = vtrim($v);
+    if ($s === '') return 'NULL';
+    return "'" . str_replace("'", "''", $s) . "'";
+}
+
+function sql_q_required($v): string {
+    return "'" . str_replace("'", "''", vtrim($v)) . "'";
+}
+
+function parse_date_value($v): ?string {
+    $s = vtrim($v);
+    if ($s !== '' && $s[0] === '#') return null;
+    if ($s === '') return null;
+    if (is_numeric($s)) {
+        $days = (int)$s;
+        if ($days > 20000 && $days < 90000) {
+            return gmdate('Y-m-d', ($days - 25569) * 86400);
+        }
+    }
+    $s = str_replace('.', '/', $s);
+    foreach (['Y-m-d', 'd/m/Y', 'j/n/Y', 'd-m-Y', 'j-n-Y', 'm/d/Y', 'n/j/Y', 'Y/m/d'] as $fmt) {
+        $dt = DateTime::createFromFormat($fmt, $s);
+        if ($dt) return $dt->format('Y-m-d');
+    }
+    $ts = strtotime(str_replace('/', '-', $s));
+    return $ts ? date('Y-m-d', $ts) : null;
+}
+
+function clean_value($v): string {
+    $s = vtrim($v);
+    return ($s !== '' && $s[0] === '#') ? '' : $s;
+}
+
+function limit_len(string $value, int $max): string {
+    if ($max <= 0) return '';
+    if (function_exists('mb_substr')) {
+        return mb_substr($value, 0, $max, 'UTF-8');
+    }
+    return substr($value, 0, $max);
+}
+
+function normalize_estado($v): string {
+    $s = clean_value($v);
+    if ($s === '') return 'Pendiente';
+    $k = norm_key($s);
+    if ($k === 'ejecutado') return 'Ejecutado';
+    if ($k === 'ejecutado_fuera_de_fecha' || $k === 'ejecutado_vencido' || $k === 'fuera_de_fecha') return 'Ejecutado fuera de fecha';
+    if ($k === 'vencido') return 'Vencido';
+    return 'Pendiente';
+}
+
+function normalize_frecuencia($v): string {
+    $s = clean_value($v);
+    $k = norm_key($s);
+    $map = [
+        'semanal' => 'Semanal',
+        'quincenal' => 'Quincenal',
+        'mensual' => 'Mensual',
+        'bimensual' => 'Bimensual',
+        'trimestral' => 'Trimestral',
+        'semestral' => 'Semestral',
+        'anual' => 'Anual',
+        'bienal' => 'Bienal',
+        'bianual' => 'Bienal',
+    ];
+    return $map[$k] ?? $s;
+}
+
+function detect_delimiter($file): string {
+    $fh = fopen($file, 'r');
+    $line = $fh ? fgets($fh) : '';
+    if ($fh) fclose($fh);
+    $candidates = [';' => substr_count($line, ';'), ',' => substr_count($line, ','), "\t" => substr_count($line, "\t")];
+    arsort($candidates);
+    return key($candidates) ?: ';';
+}
+
+function csv_row($fh, $delimiter) {
+    $row = fgetcsv($fh, 0, $delimiter);
+    if ($row && isset($row[0])) {
+        $row[0] = preg_replace('/^\xEF\xBB\xBF/', '', $row[0]);
+    }
+    return $row;
+}
+
+function fixed_position_map($fields): array {
+    $ordered = ['Code','Name','U_ItemCode','U_TipoMant','U_FechaProg','U_FechaInicioPlan','U_FechaFinPlan','U_Frecuencia','U_GeneraAuto','U_AnioBase','U_TipoPeriodo','U_Activo','U_Estado','U_Observacion','U_Modalidad'];
+    $map = [];
+    foreach ($ordered as $i => $field) {
+        if (isset($fields[$field])) $map[$field] = $i;
+    }
+    return $map;
+}
+
+function build_header_map($headers, $aliases, $fields): array {
+    $map = [];
+    $detected = [];
+    foreach ($headers as $i => $header) {
+        $raw = vtrim($header);
+        if ($raw === '') continue;
+        $key = norm_key($raw);
+        $field = $aliases[$key] ?? null;
+        if (!$field && isset($fields[$raw])) $field = $raw;
+        if (!$field && isset($fields[$key])) $field = $key;
+        if ($field && isset($fields[$field]) && !isset($map[$field])) {
+            $map[$field] = $i;
+            $detected[] = $raw . ' -> ' . $field;
+        } else {
+            $detected[] = $raw;
+        }
+    }
+    return [$map, $detected];
+}
+
+function xlsx_col_index($cellRef): int {
+    preg_match('/^([A-Z]+)/i', (string)$cellRef, $m);
+    $letters = strtoupper($m[1] ?? '');
+    $n = 0;
+    for ($i = 0; $i < strlen($letters); $i++) {
+        $n = $n * 26 + (ord($letters[$i]) - 64);
+    }
+    return max(0, $n - 1);
+}
+
+function xlsx_shared_strings($file): array {
+    $zip = new ZipArchive();
+    if ($zip->open($file) !== true) throw new RuntimeException('No se pudo abrir Excel XLSX.');
+    $xml = $zip->getFromName('xl/sharedStrings.xml');
+    $zip->close();
+    if ($xml === false) return [];
+    $sx = @simplexml_load_string($xml);
+    if (!$sx) return [];
+    $out = [];
+    foreach ($sx->si as $si) {
+        if (isset($si->t)) {
+            $out[] = (string)$si->t;
+        } else {
+            $txt = '';
+            foreach ($si->r as $r) $txt .= (string)$r->t;
+            $out[] = $txt;
+        }
+    }
+    return $out;
+}
+
+function xlsx_first_sheet_xml($file): string {
+    $zip = new ZipArchive();
+    if ($zip->open($file) !== true) throw new RuntimeException('No se pudo abrir Excel XLSX.');
+    $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+    $zip->close();
+    if ($xml === false) throw new RuntimeException('No se encontro la primera hoja del Excel.');
+    return $xml;
+}
+
+function xlsx_cell_value($cell, $shared): string {
+    $type = (string)($cell['t'] ?? '');
+    if ($type === 'inlineStr') {
+        return trim((string)($cell->is->t ?? ''));
+    }
+    $v = (string)($cell->v ?? '');
+    if ($type === 's') {
+        $idx = (int)$v;
+        return trim((string)($shared[$idx] ?? ''));
+    }
+    return trim($v);
+}
+
+function build_prog_row($raw, $map, $fields, $lineNo): array {
+    $row = [];
+    foreach ($fields as $field => $meta) {
+        $value = isset($map[$field]) ? ($raw[$map[$field]] ?? '') : '';
+        if (!empty($meta['date'])) {
+            $row[$field] = parse_date_value($value);
+        } elseif ($field === 'U_Estado') {
+            $row[$field] = normalize_estado($value);
+        } elseif ($field === 'U_Frecuencia') {
+            $row[$field] = normalize_frecuencia($value);
+        } else {
+            $row[$field] = clean_value($value);
+        }
+    }
+
+    $row['Code'] = strtoupper($row['Code'] ?? '');
+    $row['U_ItemCode'] = strtoupper($row['U_ItemCode'] ?? '');
+    $row['U_TipoMant'] = strtoupper($row['U_TipoMant'] ?? '');
+    $row['U_Modalidad'] = strtoupper($row['U_Modalidad'] ?? 'MR');
+    if (!in_array($row['U_Modalidad'], ['MR', 'M'], true)) $row['U_Modalidad'] = 'MR';
+    $row['Name'] = limit_len((string)($row['Name'] ?? ''), 100);
+    $row['U_Observacion'] = limit_len((string)($row['U_Observacion'] ?? ''), 200);
+    $row['U_GeneraAuto'] = strtoupper(clean_value($row['U_GeneraAuto'] ?? '')) ?: 'Y';
+    $row['U_Activo'] = strtoupper(clean_value($row['U_Activo'] ?? '')) ?: 'Y';
+    $row['U_FechaInicioPlan'] = $row['U_FechaInicioPlan'] ?: $row['U_FechaProg'];
+    $row['U_TipoPeriodo'] = strtoupper(clean_value($row['U_TipoPeriodo'] ?? ''));
+    if ($row['U_TipoPeriodo'] === '') {
+        $row['U_TipoPeriodo'] = strtoupper($row['U_Frecuencia']);
+    }
+    $row['U_AnioBase'] = preg_replace('/[^0-9]/', '', (string)($row['U_AnioBase'] ?? ''));
+    if ($row['U_AnioBase'] === '') {
+        $row['U_AnioBase'] = substr((string)$row['U_FechaInicioPlan'], 0, 4);
+    }
+    $row['_excel_row'] = $lineNo;
+
+    foreach ($fields as $field => $meta) {
+        if (!empty($meta['required']) && vtrim($row[$field] ?? '') === '') {
+            return [null, ['row' => $lineNo, 'code' => $row['Code'] ?? '', 'error' => $field . ' requerido']];
+        }
+    }
+
+    if (!$row['U_FechaProg']) {
+        return [null, ['row' => $lineNo, 'code' => $row['Code'] ?? '', 'error' => 'U_FechaProg invalida']];
+    }
+
+    return [$row, null];
+}
+
+function read_xlsx_batch_rows($file, $startRow, $chunk, $aliases, $fields, $sinCabecera = false): array {
+    $shared = xlsx_shared_strings($file);
+    $xml = xlsx_first_sheet_xml($file);
+    $sx = @simplexml_load_string($xml);
+    if (!$sx) throw new RuntimeException('No se pudo leer la hoja del Excel.');
+
+    $map = $sinCabecera ? fixed_position_map($fields) : null;
+    $rows = [];
+    $errors = [];
+    $hasData = false;
+
+    foreach ($sx->sheetData->row as $rowXml) {
+        $lineNo = (int)($rowXml['r'] ?? 0);
+        if ($lineNo <= 0) continue;
+        $raw = [];
+        foreach ($rowXml->c as $cell) {
+            $idx = xlsx_col_index((string)$cell['r']);
+            $raw[$idx] = xlsx_cell_value($cell, $shared);
+        }
+
+        if (!$sinCabecera && $lineNo === 1) {
+            [$map, $detected] = build_header_map($raw, $aliases, $fields);
+            $missing = [];
+            foreach ($fields as $field => $meta) {
+                if (!empty($meta['required']) && !isset($map[$field])) $missing[] = $field;
+            }
+            if ($missing) {
+                throw new RuntimeException('Faltan columnas obligatorias: ' . implode(', ', $missing) . '. Cabeceras: ' . implode(' | ', $detected));
+            }
+            continue;
+        }
+
+        if ($lineNo < $startRow) continue;
+        if ($lineNo >= $startRow + $chunk) break;
+
+        $nonEmpty = false;
+        foreach ($raw as $v) {
+            if (vtrim($v) !== '') { $nonEmpty = true; break; }
+        }
+        if (!$nonEmpty) continue;
+        $hasData = true;
+
+        [$built, $err] = build_prog_row($raw, $map, $fields, $lineNo);
+        if ($err) $errors[] = $err;
+        else $rows[] = $built;
+    }
+    return [$rows, $errors, $hasData];
+}
+
+function read_batch_rows($file, $startRow, $chunk, $aliases, $fields, $sinCabecera = false): array {
+    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+    if ($ext === 'xlsx') {
+        return read_xlsx_batch_rows($file, $startRow, $chunk, $aliases, $fields, $sinCabecera);
+    }
+
+    $delimiter = detect_delimiter($file);
+    $fh = fopen($file, 'r');
+    if (!$fh) throw new RuntimeException('No se pudo abrir archivo temporal.');
+
+    if ($sinCabecera) {
+        $map = fixed_position_map($fields);
+        $lineNo = 0;
+    } else {
+        $headers = csv_row($fh, $delimiter);
+        if (!$headers) throw new RuntimeException('El CSV no tiene cabecera.');
+        [$map, $detected] = build_header_map($headers, $aliases, $fields);
+        $missing = [];
+        foreach ($fields as $field => $meta) {
+            if (!empty($meta['required']) && !isset($map[$field])) $missing[] = $field;
+        }
+        if ($missing) {
+            throw new RuntimeException('Faltan columnas obligatorias: ' . implode(', ', $missing) . '. Cabeceras: ' . implode(' | ', $detected));
+        }
+        $lineNo = 1;
+    }
+
+    $rows = [];
+    $errors = [];
+    $hasData = false;
+    while (($raw = csv_row($fh, $delimiter)) !== false) {
+        $lineNo++;
+        if ($lineNo < $startRow) continue;
+        if ($lineNo >= $startRow + $chunk) break;
+
+        $nonEmpty = false;
+        foreach ($raw as $v) {
+            if (vtrim($v) !== '') { $nonEmpty = true; break; }
+        }
+        if (!$nonEmpty) continue;
+        $hasData = true;
+
+        [$built, $err] = build_prog_row($raw, $map, $fields, $lineNo);
+        if ($err) $errors[] = $err;
+        else $rows[] = $built;
+    }
+    fclose($fh);
+    return [$rows, $errors, $hasData];
+}
+
+function next_pm_number(PDO $pdo): int {
+    $row = $pdo->query(
+        'SELECT COALESCE(MAX(CAST(SUBSTRING("Code", 4) AS INTEGER)), 0) + 1 AS "NXT"'
+        . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+        . " WHERE \"Code\" LIKE_REGEXPR '^PM-[0-9]+$'"
+    )->fetch();
+    return (int)($row['NXT'] ?? array_values($row)[0] ?? 1);
+}
+
+function next_docentry(PDO $pdo): int {
+    $row = $pdo->query(
+        'SELECT COALESCE(MAX("DocEntry"), 0) + 1 AS "NXT" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+    )->fetch();
+    return (int)($row['NXT'] ?? array_values($row)[0] ?? 1);
+}
+
+function next_progdet_docentry(PDO $pdo): int {
+    $row = $pdo->query(
+        'SELECT COALESCE(MAX("DocEntry"), 0) + 1 AS "NXT" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+    )->fetch();
+    return (int)($row['NXT'] ?? array_values($row)[0] ?? 1);
+}
+
+function next_progdet_code(PDO $pdo): string {
+    $row = $pdo->query(
+        'SELECT COALESCE(MAX(CAST(SUBSTRING("Code", 4) AS INTEGER)), 0) + 1 AS "NXT"'
+        . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+        . " WHERE \"Code\" LIKE_REGEXPR '^PRD[0-9]+$'"
+    )->fetch();
+    $next = (int)($row['NXT'] ?? array_values($row)[0] ?? 1);
+    return 'PRD' . str_pad((string)$next, 7, '0', STR_PAD_LEFT);
+}
+
+function periodo_tipo_import(string $frecuencia, string $tipoPeriodo = ''): string {
+    $tipoPeriodo = strtoupper(trim($tipoPeriodo));
+    if ($tipoPeriodo !== '') return $tipoPeriodo;
+    $map = [
+        'SEMANAL' => 'SEMANAL',
+        'QUINCENAL' => 'QUINCENAL',
+        'MENSUAL' => 'MENSUAL',
+        'BIMENSUAL' => 'BIMENSUAL',
+        'TRIMESTRAL' => 'TRIMESTRAL',
+        'SEMESTRAL' => 'SEMESTRAL',
+        'ANUAL' => 'ANUAL',
+        'BIENAL' => 'BIENAL',
+    ];
+    return $map[strtoupper(trim($frecuencia))] ?? strtoupper(trim($frecuencia));
+}
+
+function periods_from_frequency_import(string $tipoPeriodo, int $anioBase, string $fechaInicioPlan, string $fechaFinPlan = ''): array {
+    $periods = [];
+    $start = new DateTime($fechaInicioPlan);
+    $yearStart = new DateTime(sprintf('%04d-01-01', $anioBase));
+    $cursor = $start < $yearStart ? clone $yearStart : clone $start;
+    $endLimit = $fechaFinPlan !== '' ? new DateTime($fechaFinPlan) : new DateTime(sprintf('%04d-12-31', $anioBase));
+    $yearEnd = new DateTime(sprintf('%04d-12-31', $anioBase));
+    if ($endLimit > $yearEnd) $endLimit = $yearEnd;
+
+    $periodNum = 1;
+    $tipo = strtoupper($tipoPeriodo);
+    if ($tipo === 'SEMANAL') {
+        $inicioSql = $start->format('Y-m-d');
+        $finSql = $endLimit->format('Y-m-d');
+        $rows = find_by_sql(
+            "SELECT semana, MIN(Mes) AS mes, MIN(fecha) AS fecha_inicio, MAX(fecha) AS fecha_fin
+             FROM dias_del_anio
+             WHERE YEAR(fecha) = " . (int)$anioBase . "
+             GROUP BY YEAR(fecha), semana
+             HAVING MAX(fecha) >= '" . $inicioSql . "' AND MIN(fecha) <= '" . $finSql . "'
+             ORDER BY MIN(fecha)"
+        );
+        foreach ($rows as $index => $row) {
+            $ini = max($inicioSql, substr((string)$row['fecha_inicio'], 0, 10));
+            $fin = min($finSql, substr((string)$row['fecha_fin'], 0, 10));
+            if ($ini > $fin) continue;
+            $periods[] = [
+                'num' => $index + 1,
+                'semana' => (int)$row['semana'],
+                'mes' => (int)$row['mes'],
+                'ini' => $ini,
+                'fin' => $fin,
+            ];
+        }
+        return $periods;
+    }
+    while ($cursor <= $endLimit) {
+        $ini = clone $cursor;
+        $fin = clone $cursor;
+        $semana = null;
+        $mes = (int)$ini->format('n');
+
+        switch ($tipo) {
+            case 'QUINCENAL':
+                $fin->modify('+14 days');
+                break;
+            case 'MENSUAL':
+                $fin->modify('+1 month')->modify('-1 day');
+                break;
+            case 'BIMENSUAL':
+                $fin->modify('+2 months')->modify('-1 day');
+                break;
+            case 'TRIMESTRAL':
+                $fin->modify('+3 months')->modify('-1 day');
+                break;
+            case 'SEMESTRAL':
+                $fin->modify('+6 months')->modify('-1 day');
+                break;
+            case 'ANUAL':
+                $fin->modify('+1 year')->modify('-1 day');
+                break;
+            case 'BIENAL':
+                $fin->modify('+2 years')->modify('-1 day');
+                break;
+            default:
+                $fin->modify('+1 month')->modify('-1 day');
+                break;
+        }
+
+        if ($fin > $endLimit) $fin = clone $endLimit;
+
+        $periods[] = [
+            'num' => $periodNum,
+            'semana' => $semana,
+            'mes' => $mes,
+            'ini' => $ini->format('Y-m-d'),
+            'fin' => $fin->format('Y-m-d'),
+        ];
+        $periodNum++;
+        $cursor = clone $fin;
+        $cursor->modify('+1 day');
+    }
+
+    return $periods;
+}
+
+function generate_progdet_import(PDO $pdo, string $planCode, array $row): int {
+    $fechaInicio = $row['U_FechaInicioPlan'] ?: $row['U_FechaProg'];
+    $fechaFin = $row['U_FechaFinPlan'] ?? '';
+    $anioBase = (int)($row['U_AnioBase'] ?? 0);
+    if ($anioBase <= 0) $anioBase = (int)substr((string)$fechaInicio, 0, 4);
+    $tipoPeriodo = periodo_tipo_import($row['U_Frecuencia'] ?? '', $row['U_TipoPeriodo'] ?? '');
+    if ($planCode === '' || $fechaInicio === '' || $anioBase <= 0 || $tipoPeriodo === '') {
+        return 0;
+    }
+
+    $periods = periods_from_frequency_import($tipoPeriodo, $anioBase, $fechaInicio, $fechaFin);
+    if (!$periods) return 0;
+
+    $inserted = 0;
+    $nowDate = date('Y-m-d');
+    $nowTime = (int)date('Hi');
+    $insert = $pdo->prepare(
+        'INSERT INTO "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+        . ' ("Code","Name","DocEntry","Canceled","Object","LogInst","UserSign","Transfered",'
+        . ' "CreateDate","CreateTime","UpdateDate","UpdateTime","DataSource",'
+        . ' "U_ProgMant","U_ItemCode","U_TipoMant","U_Anio","U_TipoPeriodo","U_PeriodoNum","U_Semana","U_Mes","U_FechaInicio","U_FechaFin","U_FechaProg","U_Estado","U_OTDocEntry","U_OTDocNum","U_FechaEjec","U_HoraIni","U_HoraFin","U_FueraFecha","U_Observacion")'
+        . ' VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    );
+
+    foreach ($periods as $period) {
+        $exists = $pdo->query(
+            'SELECT COUNT(*) AS "CNT" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+            . ' WHERE "U_ProgMant" = ' . sql_q_required($planCode)
+            . ' AND "U_PeriodoNum" = ' . sql_q_required((string)$period['num'])
+        )->fetch();
+        if ((int)($exists['CNT'] ?? array_values($exists)[0] ?? 0) > 0) {
+            continue;
+        }
+
+        $code = next_progdet_code($pdo);
+        $docEntry = next_progdet_docentry($pdo);
+        $name = substr($planCode . '-' . $anioBase . '-' . str_pad((string)$period['num'], 3, '0', STR_PAD_LEFT), 0, 100);
+        $insert->execute([
+            $code,
+            $name,
+            $docEntry,
+            'N',
+            'TAMA_PROGDET',
+            1,
+            1,
+            'N',
+            $nowDate,
+            $nowTime,
+            $nowDate,
+            $nowTime,
+            'I',
+            $planCode,
+            $row['U_ItemCode'],
+            $row['U_TipoMant'],
+            (string)$anioBase,
+            $tipoPeriodo,
+            (string)$period['num'],
+            $period['semana'] !== null ? (string)$period['semana'] : null,
+            (string)$period['mes'],
+            $period['ini'],
+            $period['fin'],
+            $period['ini'],
+            $row['U_Estado'] ?: 'Pendiente',
+            null,
+            null,
+            null,
+            null,
+            null,
+            'N',
+            null,
+        ]);
+        $inserted++;
+    }
+
+    return $inserted;
+}
+
+function pm_code($n): string {
+    return 'PM-' . str_pad((string)$n, 4, '0', STR_PAD_LEFT);
+}
+
+function prog_exists_by_code(PDO $pdo, string $code) {
+    if ($code === '') return false;
+    return $pdo->query(
+        'SELECT "Code" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT" WHERE "Code" = ' . sql_q_required($code)
+    )->fetch();
+}
+
+function prog_duplicate_code(PDO $pdo, array $row): string {
+    $sql = 'SELECT TOP 1 "Code" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+         . ' WHERE "Name" = ' . sql_q_required($row['Name'])
+         . ' AND "U_ItemCode" = ' . sql_q_required($row['U_ItemCode'])
+         . ' AND "U_TipoMant" = ' . sql_q_required($row['U_TipoMant'])
+         . ' AND "U_FechaProg" = ' . sql_q_required($row['U_FechaProg'])
+         . ' ORDER BY "Code"';
+    $found = $pdo->query($sql)->fetch();
+    return $found ? (string)($found['Code'] ?? array_values($found)[0] ?? '') : '';
+}
+
+function prog_name_exists_import(PDO $pdo, string $name, string $exceptCode = ''): bool {
+    $where = ' WHERE "Name" = ' . sql_q_required($name);
+    if ($exceptCode !== '') {
+        $where .= ' AND "Code" <> ' . sql_q_required($exceptCode);
+    }
+    $row = $pdo->query(
+        'SELECT COUNT(*) AS "CNT" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"' . $where
+    )->fetch();
+    return ((int)($row['CNT'] ?? array_values($row)[0] ?? 0)) > 0;
+}
+
+function prog_unique_name_import(PDO $pdo, string $name, string $code): string {
+    $base = trim($name);
+    if ($base === '') $base = $code;
+    if (!prog_name_exists_import($pdo, $base)) return $base;
+    for ($i = 1; $i <= 50; $i++) {
+        $suffix = $i === 1 ? " [{$code}]" : " [{$code}-{$i}]";
+        $limit = max(1, 100 - strlen($suffix));
+        $candidate = substr($base, 0, $limit) . $suffix;
+        if (!prog_name_exists_import($pdo, $candidate)) return $candidate;
+    }
+    return substr($code . ' ' . $base, 0, 100);
+}
+
+function equipo_info_import(PDO $pdo, string $itemcode): ?array {
+    $row = $pdo->query(
+        'SELECT TOP 1 "Name","U_ItemNameEq","U_Estado"'
+        . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM" WHERE "Name" = ' . sql_q_required($itemcode)
+    )->fetch();
+    return $row ?: null;
+}
+
+function tipo_exists(PDO $pdo, string $tipomant): bool {
+    $row = $pdo->query(
+        'SELECT TOP 1 "Code" FROM "SBO_TAMAING_PRODUC"."@TAMA_TIPOMANT" WHERE "Code" = ' . sql_q_required($tipomant)
+    )->fetch();
+    return (bool)$row;
+}
+
+function update_prog(PDO $pdo, string $code, array $row): void {
+    $nowDate = date('Y-m-d');
+    $nowTime = (int)date('Hi');
+    if (prog_name_exists_import($pdo, $row['Name'], $code)) {
+        $row['Name'] = prog_unique_name_import($pdo, $row['Name'], $code);
+    }
+    $sql = 'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT" SET'
+         . ' "Name" = ' . sql_q_required($row['Name']) . ','
+         . ' "U_ItemCode" = ' . sql_q_required($row['U_ItemCode']) . ','
+         . ' "U_TipoMant" = ' . sql_q_required($row['U_TipoMant']) . ','
+         . ' "U_Modalidad" = ' . sql_q_required($row['U_Modalidad']) . ','
+         . ' "U_FechaProg" = ' . sql_q_required($row['U_FechaProg']) . ','
+         . ' "U_FechaInicioPlan" = ' . sql_q_required($row['U_FechaInicioPlan']) . ','
+         . ' "U_FechaFinPlan" = ' . sql_q($row['U_FechaFinPlan']) . ','
+         . ' "U_Frecuencia" = ' . sql_q_required($row['U_Frecuencia']) . ','
+         . ' "U_GeneraAuto" = ' . sql_q_required($row['U_GeneraAuto']) . ','
+         . ' "U_AnioBase" = ' . sql_q_required($row['U_AnioBase']) . ','
+         . ' "U_TipoPeriodo" = ' . sql_q_required($row['U_TipoPeriodo']) . ','
+         . ' "U_Activo" = ' . sql_q_required($row['U_Activo']) . ','
+         . ' "U_Estado" = ' . sql_q_required($row['U_Estado']) . ','
+         . ' "U_Observacion" = ' . sql_q($row['U_Observacion']) . ','
+         . ' "UpdateDate" = ' . sql_q_required($nowDate) . ','
+         . ' "UpdateTime" = ' . $nowTime
+         . ' WHERE "Code" = ' . sql_q_required($code);
+    $pdo->exec($sql);
+}
+
+function insert_prog(PDO $pdo, string $code, int $docentry, array $row): void {
+    $nowDate = date('Y-m-d');
+    $nowTime = (int)date('Hi');
+    $sapName = prog_unique_name_import($pdo, $row['Name'], $code);
+    $sql = 'INSERT INTO "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+         . ' ("Code","Name","DocEntry","Canceled","Object","LogInst","UserSign","Transfered",'
+         . ' "CreateDate","CreateTime","UpdateDate","UpdateTime","DataSource",'
+         . ' "U_ItemCode","U_TipoMant","U_Modalidad","U_FechaProg","U_Frecuencia","U_Estado","U_Observacion","U_FechaInicioPlan","U_FechaFinPlan","U_GeneraAuto","U_AnioBase","U_TipoPeriodo","U_Activo")'
+          . ' VALUES ('
+          . sql_q_required($code) . ','
+          . sql_q_required($sapName) . ','
+         . $docentry . ",'N','TAMA_PROGMANT',1,1,'N',"
+         . sql_q_required($nowDate) . ',' . $nowTime . ','
+         . sql_q_required($nowDate) . ',' . $nowTime . ",'I',"
+         . sql_q_required($row['U_ItemCode']) . ','
+         . sql_q_required($row['U_TipoMant']) . ','
+         . sql_q_required($row['U_Modalidad']) . ','
+         . sql_q_required($row['U_FechaProg']) . ','
+         . sql_q_required($row['U_Frecuencia']) . ','
+         . sql_q_required($row['U_Estado']) . ','
+         . sql_q($row['U_Observacion']) . ','
+         . sql_q_required($row['U_FechaInicioPlan']) . ','
+         . sql_q($row['U_FechaFinPlan']) . ','
+         . sql_q_required($row['U_GeneraAuto']) . ','
+         . sql_q_required($row['U_AnioBase']) . ','
+         . sql_q_required($row['U_TipoPeriodo']) . ','
+         . sql_q_required($row['U_Activo'])
+         . ')';
+    $pdo->exec($sql);
+}
+
+function import_rows(array $rows, bool $actualizar): array {
+    if (!$rows) return ['inserted' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
+    $pdo = getHanaPdo();
+    $inserted = 0;
+    $updated = 0;
+    $skipped = 0;
+    $generated = 0;
+    $errors = [];
+    $nextPm = next_pm_number($pdo);
+    $nextDoc = next_docentry($pdo);
+    $equipos = [];
+    $tipos = [];
+
+    foreach ($rows as $row) {
+        try {
+            $itemcode = $row['U_ItemCode'];
+            $tipomant = $row['U_TipoMant'];
+            if (!array_key_exists($itemcode, $equipos)) $equipos[$itemcode] = equipo_info_import($pdo, $itemcode);
+            if (!$equipos[$itemcode]) {
+                $errors[] = ['row' => $row['_excel_row'] ?? '', 'code' => $row['Code'] ?? '', 'error' => 'Equipo no existe en SAP: ' . $itemcode];
+                continue;
+            }
+            if (strtoupper(trim((string)($equipos[$itemcode]['U_Estado'] ?? ''))) === 'DE BAJA') {
+                $errors[] = [
+                    'row' => $row['_excel_row'] ?? '',
+                    'code' => $row['Code'] ?? '',
+                    'error' => 'No se puede programar el equipo ' . $itemcode . ': su estado es DE BAJA.',
+                ];
+                continue;
+            }
+            if (!isset($tipos[$tipomant])) $tipos[$tipomant] = tipo_exists($pdo, $tipomant);
+            if (!$tipos[$tipomant]) {
+                $errors[] = ['row' => $row['_excel_row'] ?? '', 'code' => $row['Code'] ?? '', 'error' => 'Tipo de mantenimiento no existe: ' . $tipomant];
+                continue;
+            }
+
+            $code = $row['Code'];
+            $existing = $code !== '' ? prog_exists_by_code($pdo, $code) : false;
+            if (!$existing && $code === '') {
+                $dup = prog_duplicate_code($pdo, $row);
+                if ($dup !== '') {
+                    $existing = ['Code' => $dup];
+                    $code = $dup;
+                }
+            }
+
+            if ($existing) {
+                if (!$actualizar) {
+                    $skipped++;
+                    continue;
+                }
+                $code = $code ?: (string)($existing['Code'] ?? array_values($existing)[0] ?? '');
+                update_prog($pdo, $code, $row);
+                $pdo->exec('DELETE FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET" WHERE "U_ProgMant" = ' . sql_q_required($code) . ' AND COALESCE("U_OTDocEntry", 0) = 0');
+                if (($row['U_GeneraAuto'] ?? 'Y') === 'Y') {
+                    $generated += generate_progdet_import($pdo, $code, $row);
+                }
+                $updated++;
+                continue;
+            }
+
+            if ($code === '') {
+                do {
+                    $code = pm_code($nextPm++);
+                } while (prog_exists_by_code($pdo, $code));
+            }
+
+            insert_prog($pdo, $code, $nextDoc++, $row);
+            if (($row['U_GeneraAuto'] ?? 'Y') === 'Y') {
+                $generated += generate_progdet_import($pdo, $code, $row);
+            }
+            $inserted++;
+        } catch (Throwable $e) {
+            $errors[] = ['row' => $row['_excel_row'] ?? '', 'code' => $row['Code'] ?? '', 'error' => $e->getMessage()];
+        }
+    }
+
+    return ['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped, 'generated' => $generated, 'errors' => $errors];
+}
+
+function xlsx_col_name(int $index): string {
+    $index++;
+    $name = '';
+    while ($index > 0) {
+        $rem = ($index - 1) % 26;
+        $name = chr(65 + $rem) . $name;
+        $index = intdiv($index - 1, 26);
+    }
+    return $name;
+}
+
+function xml_e($v): string {
+    return htmlspecialchars((string)$v, ENT_QUOTES | ENT_XML1, 'UTF-8');
+}
+
+function xlsx_row_xml(array $values, int $row): string {
+    $cells = '';
+    foreach ($values as $i => $value) {
+        $ref = xlsx_col_name($i) . $row;
+        $cells .= '<c r="' . $ref . '" t="inlineStr"><is><t>' . xml_e($value) . '</t></is></c>';
+    }
+    return '<row r="' . $row . '">' . $cells . '</row>';
+}
+
+function output_template_xlsx(bool $withExample = false): void {
+    $headers = ['Code','Name','U_ItemCode','U_TipoMant','U_FechaProg','U_FechaInicioPlan','U_FechaFinPlan','U_Frecuencia','U_GeneraAuto','U_AnioBase','U_TipoPeriodo','U_Activo','U_Estado','U_Observacion','U_Modalidad'];
+    $exampleRows = $withExample ? [
+        ['', 'Mantenimiento Preventivo Compresor Principal', 'EQ-COMP-001', 'PREV', '2026-08-15', '2026-08-15', '', 'Mensual', 'Y', '2026', 'MENSUAL', 'Y', 'Pendiente', 'Lubricacion general y revision de filtros.'],
+        ['PM-0105', 'Mantenimiento Preventivo Planta Electrica', 'EQ-PLANTA-002', 'PREV', '2026-01-10', '2026-01-10', '2026-12-31', 'Mensual', 'Y', '2026', 'MENSUAL', 'Y', 'Pendiente', 'Si el Code ya existe y marcas actualizar, el registro se modifica.'],
+    ] : [];
+
+    if (!class_exists('ZipArchive')) {
+        while (ob_get_level()) { ob_end_clean(); }
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . ($withExample ? 'ejemplo_programacion_mantenimiento.csv' : 'plantilla_programacion_mantenimiento.csv') . '"');
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        fputcsv($out, $headers, ';');
+        foreach ($exampleRows as $row) {
+            fputcsv($out, $row, ';');
+        }
+        fclose($out);
+        exit;
+    }
+
+    $tmp = tempnam(sys_get_temp_dir(), 'prog_tpl_');
+    $zip = new ZipArchive();
+    if ($zip->open($tmp, ZipArchive::OVERWRITE) !== true) {
+        throw new RuntimeException('No se pudo crear la plantilla.');
+    }
+
+    $sheetRows = xlsx_row_xml($headers, 1);
+    $rowNumber = 2;
+    foreach ($exampleRows as $row) {
+        $sheetRows .= xlsx_row_xml($row, $rowNumber++);
+    }
+
+    $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        . '<dimension ref="A1:N' . max(1, $rowNumber - 1) . '"/>'
+        . '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
+        . '<cols><col min="1" max="1" width="16" customWidth="1"/><col min="2" max="2" width="34" customWidth="1"/><col min="3" max="14" width="20" customWidth="1"/></cols>'
+        . '<sheetData>'
+        . $sheetRows
+        . '</sheetData></worksheet>';
+
+    $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+    $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+    $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Programacion" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
+    $zip->addFromString('xl/worksheets/sheet1.xml', $sheet);
+    $zip->close();
+
+    while (ob_get_level()) { ob_end_clean(); }
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . ($withExample ? 'ejemplo_programacion_mantenimiento.xlsx' : 'plantilla_programacion_mantenimiento.xlsx') . '"');
+    header('Content-Length: ' . filesize($tmp));
+    readfile($tmp);
+    @unlink($tmp);
+    exit;
+}
+
+try {
+    if (isset($_GET['template'])) {
+        output_template_xlsx(false);
+    }
+    if (isset($_GET['template_example'])) {
+        output_template_xlsx(true);
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        api_out(['success' => false, 'error' => 'Metodo no permitido'], 405);
+    }
+
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'prepare') {
+        if (!isset($_FILES['archivo']) || ($_FILES['archivo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            api_out(['success' => false, 'error' => 'No se recibio archivo valido'], 400);
+        }
+        $dir = dirname(dirname(__DIR__)) . '/uploads/tmp_import_prog';
+        if (!is_dir($dir)) mkdir($dir, 0775, true);
+        $ext = strtolower(pathinfo($_FILES['archivo']['name'] ?? '', PATHINFO_EXTENSION));
+        if (!in_array($ext, ['xlsx', 'csv'], true)) {
+            api_out(['success' => false, 'error' => 'Solo se permite Excel .xlsx o CSV'], 400);
+        }
+        $token = 'prog_' . date('YmdHis') . '_' . bin2hex(random_bytes(4));
+        $dest = $dir . '/' . $token . '.' . $ext;
+        if (!move_uploaded_file($_FILES['archivo']['tmp_name'], $dest)) {
+            api_out(['success' => false, 'error' => 'No se pudo guardar archivo temporal'], 500);
+        }
+        $sinCabecera = !empty($_POST['sin_cabecera']);
+        $_SESSION['import_prog'][$token] = [
+            'file' => $dest,
+            'actualizar' => !empty($_POST['actualizar']),
+            'sin_cabecera' => $sinCabecera,
+        ];
+        api_out([
+            'success' => true,
+            'token' => $token,
+            'chunk' => 500,
+            'start' => $sinCabecera ? 1 : 2,
+            'message' => 'Archivo preparado. Inicie la importacion por lotes.',
+        ]);
+    }
+
+    if ($action === 'batch') {
+        $token = preg_replace('/[^a-zA-Z0-9_]/', '', $_POST['token'] ?? '');
+        $start = max(1, (int)($_POST['start'] ?? 2));
+        $chunk = max(1, min(1000, (int)($_POST['chunk'] ?? 500)));
+        $info = $_SESSION['import_prog'][$token] ?? null;
+        if (!$info || empty($info['file']) || !is_file($info['file'])) {
+            api_out(['success' => false, 'error' => 'Archivo temporal no encontrado. Vuelva a subirlo.'], 400);
+        }
+
+        [$rows, $parseErrors, $hasData] = read_batch_rows($info['file'], $start, $chunk, $aliases, $fields, !empty($info['sin_cabecera']));
+        if (!$hasData) {
+            @unlink($info['file']);
+            unset($_SESSION['import_prog'][$token]);
+            api_out(['success' => true, 'done' => true, 'inserted' => 0, 'updated' => 0, 'skipped' => 0, 'errors_count' => 0, 'errors' => [], 'message' => 'Importacion terminada.']);
+        }
+
+        $res = import_rows($rows, !empty($info['actualizar']));
+        $allErrors = array_merge($parseErrors, $res['errors']);
+        api_out([
+            'success' => true,
+            'done' => false,
+            'inserted' => $res['inserted'],
+            'updated' => $res['updated'],
+            'skipped' => $res['skipped'],
+            'generated' => $res['generated'] ?? 0,
+            'errors_count' => count($allErrors),
+            'errors' => array_slice($allErrors, 0, 30),
+            'nextStart' => $start + $chunk,
+            'message' => 'Lote ' . $start . '-' . ($start + $chunk - 1) . ': '
+                . $res['inserted'] . ' insertado(s), '
+                . $res['updated'] . ' actualizado(s), '
+                . ($res['generated'] ?? 0) . ' ocurrencia(s) generada(s), '
+                . $res['skipped'] . ' omitido(s), '
+                . count($allErrors) . ' error(es).',
+        ]);
+    }
+
+    api_out(['success' => false, 'error' => 'Accion no reconocida'], 400);
+} catch (Throwable $e) {
+    error_log('import_prog: ' . $e->getMessage());
+    api_out(['success' => false, 'error' => $e->getMessage(), 'line' => $e->getLine()], 500);
+}

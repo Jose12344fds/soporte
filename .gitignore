@@ -1,0 +1,38 @@
+
+# Credenciales y configuraciones privadas
+.env
+.env.*
+!.env.example
+
+# Entornos virtuales
+.venv/
+venv/
+
+# Respaldos
+backups/
+backup.txt
+index.php.backup_*
+*.bak
+*.backup
+
+# Archivos temporales
+.codex_tmp_inc_flujo/
+_tmp_BienestarSoc.php
+_tmp_cumpleanos.php
+tmp_reporte_ind_test.php
+*.tmp
+*.log
+
+# Archivos privados de usuarios
+uploads/*
+!uploads/.gitkeep
+
+# Datos temporales de la aplicación
+storage/*
+!storage/.gitkeep
+
+# Excluir módulo SAP API
+SAP.API/
+
+# Ejemplo de entorno adicional, revisar antes de publicar
+.env copy.example

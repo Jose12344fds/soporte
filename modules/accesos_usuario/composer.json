@@ -1,0 +1,6 @@
+{
+    "require": {
+        "hfig/mapi": "^1.4",
+        "pear/pear-core-minimal": "^1.10.16"
+    }
+}

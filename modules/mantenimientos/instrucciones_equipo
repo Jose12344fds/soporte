@@ -1,0 +1,23 @@
+CodComtaSap este campo agregue  en la tabla @TAMA_EQUIPOS_TM, entonces puenes agregarme en [http://192.168.4.8:8085/soporte/modules/mantenimientos/equipos.php](http://192.168.4.8:8085/soporte/modules/mantenimientos/equipos.php), tango en agregar y editar. y en el reporte de descarga quiero que me agregues la variable. , cuando descargo desde este boton :btnReporteEstado  . desde ese botón quiero esta estructura. 
+primera columna un contador de filas. 
+
+Titulo 
+: Item , va a ser auto incremental , de 1  Alas filas que TENERMOS
+: Cod Tipo , esta columna no exporta pero quiero que se la siguiente columna que exporte. 
+: Despues pones el codigo de compabilidad . que creamos en sap. 
+: Tipo EMH , quiero poner esta columna. 
+: nombre del equipo, ,
+: marca
+: modelo
+: serie
+:fecha de adquisición ,
+:criticidad
+: nivel de criticidad,
+: ubicación , 
+:estado. 
+:fecha baja. 
+:vida útil,
+: comentarios si hay
+:registro, 
+
+mas referencias de todos los nombre que te puse en editar. aogunos si los tienes claro. 

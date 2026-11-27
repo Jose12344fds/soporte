@@ -1,0 +1,41 @@
+#modalAsignar .modal-content { border:0; border-radius:12px; overflow:hidden; box-shadow:0 24px 70px rgba(18,52,72,.28); }
+#modalAsignar .modal-header { padding:16px 20px; background:linear-gradient(135deg,#0f4c81,#1c7c8c); border:0; }
+#modalAsignar .modal-body { padding:20px; background:#f6f9fb; }
+#modalAsignar .assignment-equipment { display:flex; align-items:center; gap:14px; padding:14px; border-radius:10px; background:#102f43; color:#fff; }
+#modalAsignar .assignment-equipment .icon { width:46px; height:46px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:rgba(255,255,255,.12); font-size:21px; }
+#modalAsignar .assignment-current { padding:12px 14px; border:1px solid #d7e4eb; border-radius:9px; background:#fff; }
+#modalAsignar .assignment-current .user-name { color:#123e57; font-size:15px; font-weight:800; }
+#modalAsignar .assignment-form-card { padding:15px; border:1px solid #d7e4eb; border-radius:9px; background:#fff; }
+#modalAsignar label { color:#385568; font-size:12px; font-weight:800; }
+#modalAsignar .select2-container { width:100% !important; }
+#modalAsignar .select2-selection--single { min-height:38px; padding-top:4px; border-color:#bfd0da; }
+#modalAsignar .selected-user-preview { display:none; margin-top:9px; padding:9px 11px; border-radius:7px; background:#eaf7f1; color:#246044; font-size:12px; }
+#modalAsignar .assignment-history { max-height:170px; overflow:auto; }
+#modalAsignar .history-item { padding:8px 4px; border-bottom:1px solid #edf1f3; font-size:12px; }
+#modalAsignar .history-item:last-child { border-bottom:0; }
+#modalAsignar .asignar-factor { padding:11px; border:1px solid #dce5ea; border-radius:8px; background:#f9fbfc; }
+#modalAsignar .asignar-factor small { display:block; color:#71808b; margin-bottom:7px; }
+#modalAsignar .asignar-score { width:34px; height:32px; border:1px solid #9eb1bc; background:#fff; color:#385466; font-weight:700; border-radius:6px; margin-right:3px; }
+#modalAsignar .asignar-score.active { background:#087f8c; border-color:#087f8c; color:#fff; }
+.activos-card-header{display:grid;grid-template-columns:minmax(260px,1fr) minmax(280px,460px) minmax(260px,1fr);align-items:center;gap:16px}
+.activos-title-wrap{display:flex;align-items:center;gap:10px}
+.activos-title-wrap .card-title{float:none;margin:0}
+#activosLength{width:58px;height:30px;padding:2px 20px 2px 8px;font-size:12px}
+.activos-search{position:relative;width:100%}
+.activos-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#82909d;font-size:12px}
+.activos-search input{height:34px;padding-left:34px;border-radius:18px;font-size:12px}
+.activos-card-header .card-tools{float:none;margin:0;justify-self:end}
+#tblActivos{font-size:12px}
+#tblActivos thead th{font-size:11px;white-space:nowrap;vertical-align:middle}
+#tblActivos tbody td{padding:.38rem;vertical-align:middle}
+#tblActivos th:first-child,#tblActivos td:first-child{width:28px!important;min-width:28px!important;max-width:28px!important;padding-left:2px!important;padding-right:2px!important;text-align:center}
+#modalEvaluarActivo .modal-content{border:0;border-radius:13px;overflow:hidden;box-shadow:0 24px 65px rgba(26,43,62,.28)}
+#modalEvaluarActivo .modal-header{background:linear-gradient(135deg,#172b4d,#086f83);color:#fff;border:0}
+.evaluacion-resumen{padding:12px 14px;border-radius:9px;background:#edf7fa;border:1px solid #cfe5eb}
+.evaluacion-factor{padding:13px;border:1px solid #dce5ea;border-radius:9px;background:#fff}
+.evaluacion-factor small{display:block;color:#6c7b87;margin-bottom:8px}
+.evaluacion-score{width:38px;height:36px;border:1px solid #9eb1bc;background:#fff;color:#385466;font-weight:700;border-radius:7px;margin-right:5px}
+.evaluacion-score.active{background:#087f8c;border-color:#087f8c;color:#fff;box-shadow:0 4px 10px rgba(8,127,140,.25)}
+.evaluacion-resultado{display:flex;justify-content:space-between;align-items:center;padding:14px;border-radius:9px;background:#f6f8fa;border:1px solid #dfe5e9}
+.evaluacion-nivel{font-size:18px;font-weight:800;color:#19384b}
+@media(max-width:991px){.activos-card-header{grid-template-columns:1fr}.activos-card-header .card-tools{justify-self:start}.activos-search{max-width:none}}

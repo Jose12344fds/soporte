@@ -1,0 +1,432 @@
+<?php
+/**
+ * API: CRUD de equipos en SAP @TAMA_EQUIPOS_TM.
+ */
+ob_start();
+error_reporting(0);
+ini_set('display_errors', 0);
+header('Content-Type: application/json; charset=utf-8');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    api_out(['success' => false, 'error' => 'Metodo no permitido'], 405);
+}
+
+require_once __DIR__ . '/conexion_hana.php';
+require_once dirname(dirname(__DIR__)) . '/includes/load.php';
+
+if (!$session->isUserLoggedIn(false)) {
+    api_out(['success' => false, 'error' => 'No autorizado'], 401);
+}
+
+function api_out(array $data, int $code = 200): void {
+    while (ob_get_level()) { ob_end_clean(); }
+    http_response_code($code);
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
+
+function vtrim($v): string {
+    $value = trim((string)($v ?? ''));
+    // Elimina controles C1 invisibles (p. ej. U+0081) que SAP puede conservar
+    // junto a letras acentuadas y que el navegador representa como un cuadro.
+    return preg_replace('/[\x{0080}-\x{009F}]/u', '', $value) ?? $value;
+}
+
+function hana_write_text(string $value): string {
+    // HDBODBC en Windows espera los literales de texto en la página ANSI.
+    // Enviarlos como UTF-8 duplica caracteres como Á: MÁQUINA -> MÃQUINA.
+    $encoded = iconv('UTF-8', 'Windows-1252//TRANSLIT', $value);
+    return $encoded !== false ? $encoded : $value;
+}
+
+function sql_q($v): string {
+    $s = vtrim($v);
+    if ($s === '') return 'NULL';
+    $s = hana_write_text($s);
+    return "'" . str_replace("'", "''", $s) . "'";
+}
+
+function sql_q_required($v): string {
+    return "'" . str_replace("'", "''", hana_write_text(vtrim($v))) . "'";
+}
+
+function sql_int_or_null($v): string {
+    $s = vtrim($v);
+    if ($s === '') return 'NULL';
+    if (!preg_match('/^-?\d+$/', $s)) {
+        throw new InvalidArgumentException('El valor debe ser entero.');
+    }
+    return (string)((int)$s);
+}
+
+function equipo_query_one(PDO $pdo, string $sql): ?array {
+    $stmt = $pdo->query($sql);
+    try {
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    } finally {
+        $stmt->closeCursor();
+    }
+}
+
+function equipo_col_exists(PDO $pdo, string $column): bool {
+    try {
+        equipo_query_one(
+            $pdo,
+            'SELECT "' . str_replace('"', '""', $column)
+            . '" FROM "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM" LIMIT 1'
+        );
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function equipo_assert_cod_contable(PDO $pdo, string $value, string $exceptCode = ''): string {
+    $codigo = strtoupper(vtrim($value));
+    if ($codigo === '') {
+        return '';
+    }
+
+    $sql = 'SELECT TOP 1 "Code","Name","U_ItemNameEq"'
+        . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM"'
+        . ' WHERE UPPER(TRIM(COALESCE("U_CodComtaSap", \'\'))) = ' . sql_q_required($codigo);
+    if ($exceptCode !== '') {
+        $sql .= ' AND "Code" <> ' . sql_q_required($exceptCode);
+    }
+    $sql .= ' ORDER BY "Code"';
+    $duplicate = equipo_query_one($pdo, $sql);
+    if ($duplicate) {
+        $equipo = vtrim($duplicate['Name'] ?? '');
+        $nombre = vtrim($duplicate['U_ItemNameEq'] ?? '');
+        api_out([
+            'success' => false,
+            'error' => 'El Codigo contable SAP ' . $codigo . ' ya esta asignado al equipo '
+                . ($equipo !== '' ? $equipo : ($duplicate['Code'] ?? ''))
+                . ($nombre !== '' ? ' - ' . $nombre : '') . '.',
+            'duplicate' => true,
+            'duplicate_code' => $duplicate['Code'] ?? '',
+            'duplicate_itemcode' => $equipo,
+        ], 409);
+    }
+    return $codigo;
+}
+
+function clean_date_or_null($v): ?string {
+    $s = vtrim($v);
+    if ($s === '') return null;
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $s)) return null;
+    return $s;
+}
+
+function next_equipo_code(PDO $pdo): int {
+    $row = $pdo->query(
+        'SELECT COALESCE(MAX(CAST("Code" AS INTEGER)), 0) + 1 AS "NEXT_CODE"'
+        . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM"'
+        . " WHERE \"Code\" IS NOT NULL AND LENGTH(\"Code\") > 0 AND \"Code\" LIKE_REGEXPR '^[0-9]+$'"
+    )->fetch();
+    return (int)($row['NEXT_CODE'] ?? array_values($row)[0] ?? 1);
+}
+
+function equipo_payload(array $input): array {
+    $name = strtoupper(vtrim($input['itemcode'] ?? $input['Name'] ?? $input['name'] ?? ''));
+    $fechaAdq = clean_date_or_null($input['fecha_adq'] ?? $input['U_Fecha_Adq'] ?? null);
+    $fechaBaja = clean_date_or_null($input['fecha_baja'] ?? $input['U_FECHA_BAJA'] ?? null);
+    $estado = strtoupper(vtrim($input['estado'] ?? $input['U_Estado'] ?? 'ACTIVO'));
+    if ($estado === '') $estado = 'ACTIVO';
+
+    return [
+        'Name' => $name,
+        'U_ItemNameEq' => vtrim($input['itemname'] ?? $input['U_ItemNameEq'] ?? ''),
+        'U_InventryNo' => vtrim($input['inventryno'] ?? $input['U_InventryNo'] ?? ''),
+        'U_AssetSerNo' => vtrim($input['assetserno'] ?? $input['U_AssetSerNo'] ?? ''),
+        'U_Marca' => vtrim($input['marca'] ?? $input['U_Marca'] ?? ''),
+        'U_Modelo' => vtrim($input['modelo'] ?? $input['U_Modelo'] ?? ''),
+        'U_TIP_EMH' => vtrim($input['tip_emh'] ?? $input['U_TIP_EMH'] ?? ''),
+        'U_Cod_Tipo' => vtrim($input['cod_tipo'] ?? $input['U_Cod_Tipo'] ?? ''),
+        'U_CodComtaSap' => vtrim($input['cod_comta_sap'] ?? $input['U_CodComtaSap'] ?? ''),
+        'U_Fecha_Adq' => $fechaAdq,
+        'U_Criterio' => vtrim($input['criterio'] ?? $input['U_Criterio'] ?? ''),
+        'U_Nivel_Criterio' => vtrim($input['nivel_criterio'] ?? $input['U_Nivel_Criterio'] ?? ''),
+        'U_UBICACION' => vtrim($input['ubicacion'] ?? $input['U_UBICACION'] ?? ''),
+        'U_Estado' => $estado,
+        'U_FECHA_BAJA' => $fechaBaja,
+        'U_Vida_Util' => vtrim($input['vida_util'] ?? $input['U_Vida_Util'] ?? ''),
+        'U_Id_Proceso' => vtrim($input['id_proceso'] ?? $input['U_Id_Proceso'] ?? ''),
+        'U_CodRegistro' => vtrim($input['codregistro'] ?? $input['U_CodRegistro'] ?? ''),
+        'U_Observacion' => mb_substr(vtrim($input['observacion'] ?? $input['U_Observacion'] ?? ''), 0, 254),
+    ];
+}
+
+function equipo_select_sql(string $where): string {
+    $codRegistroColumn = $GLOBALS['codRegistroColumn'] ?? '';
+    return 'SELECT'
+        . ' "Code","Name","U_ItemNameEq","U_InventryNo","U_AssetSerNo","U_Marca","U_Modelo",'
+        . ' "U_TIP_EMH","U_Cod_Tipo"'
+        . (isset($GLOBALS['hasCodComtaSap']) && $GLOBALS['hasCodComtaSap'] ? ',"U_CodComtaSap"' : ',NULL AS "U_CodComtaSap"')
+        . ',"U_Fecha_Adq","U_Criterio","U_Nivel_Criterio",'
+        . ' "U_UBICACION","U_Estado","U_FECHA_BAJA","U_Vida_Util","U_Id_Proceso"'
+        . ($codRegistroColumn !== '' ? ',"' . $codRegistroColumn . '" AS "U_CodRegistro"' : ',NULL AS "U_CodRegistro"')
+        . (!empty($GLOBALS['hasObservacion']) ? ',"U_Observacion"' : ',NULL AS "U_Observacion"')
+        . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM" ' . $where;
+}
+
+function fetch_equipo(PDO $pdo, string $code): ?array {
+    return equipo_query_one($pdo, equipo_select_sql('WHERE "Code" = ' . sql_q_required($code)));
+}
+
+/**
+ * Detiene la programacion desde la baja sin borrar el historial del equipo.
+ * Las ocurrencias con OT se conservan para cerrar o anular la orden expresamente.
+ */
+function cancelar_programacion_por_baja(string $itemCode, string $fechaBaja): array {
+    $result = ['planes_inactivados' => 0, 'ocurrencias_canceladas' => 0, 'ocurrencias_con_ot' => 0];
+    if ($itemCode === '' || $fechaBaja === '') return $result;
+
+    $today = date('Y-m-d');
+    // Los campos de hora de las UDT SAP almacenan HHMM, no HHMMSS.
+    $nowTime = (int)date('Hi');
+
+    $motivo = 'Cancelada por baja del equipo desde ' . $fechaBaja . '.';
+
+    // HDBODBC produce HY010 al actualizar varias UDT en la misma conexion.
+    // Cada operacion usa SQL directo y una conexion independiente.
+    $planPdo = getHanaPdo();
+    $planes = $planPdo->exec(
+        'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+        . ' SET "U_Activo" = \'N\', "UpdateDate" = ' . sql_q_required($today)
+        . ', "UpdateTime" = ' . $nowTime
+        . ' WHERE "U_ItemCode" = ' . sql_q_required($itemCode)
+        . ' AND COALESCE("U_Activo", \'Y\') <> \'N\''
+    );
+    $result['planes_inactivados'] = max(0, (int)$planes);
+    $planPdo = null;
+
+    $occurrencePdo = getHanaPdo();
+    $canceladas = $occurrencePdo->exec(
+        'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+        . ' SET "U_Estado" = \'Cancelado\','
+        . ' "U_Observacion" = COALESCE(NULLIF("U_Observacion", \'\'), ' . sql_q_required($motivo) . '),'
+        . ' "UpdateDate" = ' . sql_q_required($today) . ', "UpdateTime" = ' . $nowTime
+        . ' WHERE "U_ProgMant" IN (SELECT P."Code" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT" P'
+        . ' WHERE P."U_ItemCode" = ' . sql_q_required($itemCode) . ')'
+        . ' AND "U_FechaProg" >= ' . sql_q_required($fechaBaja)
+        . ' AND COALESCE("U_Estado", \'Pendiente\') IN (\'Pendiente\', \'Vencido\')'
+        . ' AND "Code" NOT IN ('
+        . ' SELECT OT."U_ProgDet" FROM "SBO_TAMAING_PRODUC"."@TAMA_ORDTRABAJO" OT'
+        . ' WHERE COALESCE(OT."Canceled", \'N\') <> \'Y\' AND OT."U_ProgDet" IS NOT NULL)'
+    );
+    $result['ocurrencias_canceladas'] = max(0, (int)$canceladas);
+    $occurrencePdo = null;
+    return $result;
+}
+
+$stage = 'inicio';
+try {
+    $raw = file_get_contents('php://input');
+    $input = !empty($raw) ? (json_decode($raw, true) ?? $_POST) : $_POST;
+    $action = strtolower(vtrim($input['action'] ?? $input['accion'] ?? 'crear'));
+    if ($action === 'create') $action = 'crear';
+    if ($action === 'update') $action = 'actualizar';
+    if ($action === 'delete') $action = 'eliminar';
+
+    $stage = 'conexion SAP HANA';
+    $pdo = getHanaPdo();
+    $GLOBALS['codRegistroColumn'] = equipo_col_exists($pdo, 'U_CodRegistro')
+        ? 'U_CodRegistro'
+        : (equipo_col_exists($pdo, 'U_CodRegisto') ? 'U_CodRegisto' : '');
+    $GLOBALS['hasCodRegistro'] = $GLOBALS['codRegistroColumn'] !== '';
+    $GLOBALS['hasCodComtaSap'] = equipo_col_exists($pdo, 'U_CodComtaSap');
+    $GLOBALS['hasObservacion'] = equipo_col_exists($pdo, 'U_Observacion');
+
+    if ($action === 'eliminar') {
+        $code = vtrim($input['code'] ?? $input['Code'] ?? '');
+        if ($code === '') api_out(['success' => false, 'error' => 'Code requerido'], 400);
+        $actual = fetch_equipo($pdo, $code);
+        if (!$actual) api_out(['success' => false, 'error' => 'Equipo no encontrado'], 404);
+
+        $fechaBaja = date('Y-m-d');
+        $stage = 'inicio de baja';
+        $pdo->beginTransaction();
+        try {
+            $stage = 'guardar estado DE BAJA';
+            $pdo->exec(
+                'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM"'
+                . ' SET "U_Estado" = ' . sql_q_required('DE BAJA') . ','
+                . ' "U_FECHA_BAJA" = COALESCE("U_FECHA_BAJA", CURRENT_DATE)'
+                . ' WHERE "Code" = ' . sql_q_required($code)
+            );
+            $stage = 'confirmar baja';
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+        $baja = ['planes_inactivados' => 0, 'ocurrencias_canceladas' => 0, 'ocurrencias_con_ot' => 0];
+        $bajaError = '';
+        try {
+            $stage = 'cancelar programacion por baja';
+            $baja = cancelar_programacion_por_baja(vtrim($actual['Name'] ?? ''), $fechaBaja);
+        } catch (Throwable $bajaEx) {
+            $bajaError = $bajaEx->getMessage();
+        }
+
+        api_out([
+            'success' => true,
+            'action' => 'eliminar',
+            'message' => 'Equipo dado de baja y programacion futura detenida',
+            'Code' => $code,
+            'ItemCode' => $actual['Name'] ?? '',
+            'ItemName' => $actual['U_ItemNameEq'] ?? '',
+            'baja' => $baja,
+            'baja_error' => $bajaError,
+        ]);
+    }
+
+    $row = equipo_payload($input);
+    if (!$GLOBALS['hasCodComtaSap']) {
+        api_out(['success' => false, 'error' => 'SAP no tiene configurado U_CodComtaSap en @TAMA_EQUIPOS_TM.'], 409);
+    }
+    if ($GLOBALS['hasCodRegistro']) {
+        $row[$GLOBALS['codRegistroColumn']] = $row['U_CodRegistro'];
+    } elseif ($row['U_CodRegistro'] !== '') {
+        api_out(['success' => false, 'error' => 'SAP no tiene configurado el campo de Registro en @TAMA_EQUIPOS_TM.'], 409);
+    }
+    if (!$GLOBALS['hasObservacion'] && $row['U_Observacion'] !== '') {
+        api_out(['success' => false, 'error' => 'SAP no tiene configurado U_Observacion en @TAMA_EQUIPOS_TM. Cree el campo tipo Alfanumerico (254) para guardar Observaciones del equipo.'], 409);
+    }
+
+    if ($action === 'actualizar') {
+        $code = vtrim($input['code'] ?? $input['Code'] ?? '');
+        if ($code === '') api_out(['success' => false, 'error' => 'Code requerido'], 400);
+        $row['U_CodComtaSap'] = equipo_assert_cod_contable($pdo, $row['U_CodComtaSap'], $code);
+        $actual = fetch_equipo($pdo, $code);
+        if (!$actual) api_out(['success' => false, 'error' => 'Equipo no encontrado'], 404);
+
+        if ($row['Name'] === '') $row['Name'] = vtrim($actual['Name'] ?? '');
+        if ($row['U_ItemNameEq'] === '') {
+            api_out(['success' => false, 'error' => 'Nombre del equipo obligatorio'], 400);
+        }
+        if ($row['U_Estado'] === 'DE BAJA' && empty($row['U_FECHA_BAJA'])) {
+            $row['U_FECHA_BAJA'] = date('Y-m-d');
+        }
+
+        $dup = equipo_query_one($pdo,
+            'SELECT COUNT(*) AS "CNT" FROM "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM"'
+            . ' WHERE "Name" = ' . sql_q_required($row['Name'])
+            . ' AND "Code" <> ' . sql_q_required($code)
+        ) ?: [];
+        if ((int)($dup['CNT'] ?? array_values($dup)[0] ?? 0) > 0) {
+            api_out(['success' => false, 'error' => "El codigo de equipo '{$row['Name']}' ya existe"], 409);
+        }
+
+        $cols = ['Name','U_ItemNameEq','U_InventryNo','U_AssetSerNo','U_Marca','U_Modelo','U_TIP_EMH','U_Cod_Tipo','U_Fecha_Adq','U_Criterio','U_Nivel_Criterio','U_UBICACION','U_Estado','U_FECHA_BAJA','U_Vida_Util','U_Id_Proceso'];
+        if ($GLOBALS['hasCodComtaSap']) array_splice($cols, 8, 0, ['U_CodComtaSap']);
+        if ($GLOBALS['hasCodRegistro']) $cols[] = $GLOBALS['codRegistroColumn'];
+        if ($GLOBALS['hasObservacion']) $cols[] = 'U_Observacion';
+        $sets = [];
+        foreach ($cols as $c) {
+            $sets[] = '"' . $c . '" = ' . (in_array($c, ['U_Id_Proceso','U_CodRegistro','U_CodRegisto'], true) ? sql_int_or_null($row[$c]) : ($c === 'Name' ? sql_q_required($row[$c]) : sql_q($row[$c])));
+        }
+
+        $stage = 'inicio de actualizacion';
+        $pdo->beginTransaction();
+        try {
+            $stage = 'actualizar datos del equipo';
+            $pdo->exec(
+                'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM" SET '
+                . implode(',', $sets)
+                . ' WHERE "Code" = ' . sql_q_required($code)
+            );
+            $stage = 'confirmar actualizacion';
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+        $baja = ['planes_inactivados' => 0, 'ocurrencias_canceladas' => 0, 'ocurrencias_con_ot' => 0];
+        $bajaError = '';
+        if ($row['U_Estado'] === 'DE BAJA') {
+            try {
+                $stage = 'cancelar programacion por baja';
+                $baja = cancelar_programacion_por_baja($row['Name'], (string)$row['U_FECHA_BAJA']);
+            } catch (Throwable $bajaEx) {
+                $bajaError = $bajaEx->getMessage();
+            }
+        }
+
+        api_out([
+            'success' => true,
+            'action' => 'actualizar',
+            'Code' => $code,
+            'ItemCode' => $row['Name'],
+            'ItemName' => $row['U_ItemNameEq'],
+            'row' => fetch_equipo($pdo, $code),
+            'baja' => $baja,
+            'baja_error' => $bajaError,
+        ]);
+    }
+
+    if ($row['Name'] === '' || $row['U_ItemNameEq'] === '') {
+        api_out(['success' => false, 'error' => 'Codigo y nombre del equipo son obligatorios'], 400);
+    }
+    $row['U_CodComtaSap'] = equipo_assert_cod_contable($pdo, $row['U_CodComtaSap']);
+
+    $exists = equipo_query_one($pdo,
+        'SELECT COUNT(*) AS "CNT" FROM "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM"'
+        . ' WHERE "Name" = ' . sql_q_required($row['Name'])
+    ) ?: [];
+    if ((int)($exists['CNT'] ?? array_values($exists)[0] ?? 0) > 0) {
+        api_out(['success' => false, 'error' => "El equipo '{$row['Name']}' ya existe"], 409);
+    }
+
+    $cols = ['U_ItemNameEq','U_InventryNo','U_AssetSerNo','U_Marca','U_Modelo','U_TIP_EMH','U_Cod_Tipo','U_Fecha_Adq','U_Criterio','U_Nivel_Criterio','U_UBICACION','U_Estado','U_FECHA_BAJA','U_Vida_Util','U_Id_Proceso'];
+    if ($GLOBALS['hasCodComtaSap']) array_splice($cols, 7, 0, ['U_CodComtaSap']);
+    if ($GLOBALS['hasCodRegistro']) $cols[] = $GLOBALS['codRegistroColumn'];
+    if ($GLOBALS['hasObservacion']) $cols[] = 'U_Observacion';
+    $lastError = null;
+    for ($attempt = 1; $attempt <= 5; $attempt++) {
+        $code = (string)next_equipo_code($pdo);
+        $fields = ['"Code"', '"Name"'];
+        $values = [sql_q_required($code), sql_q_required($row['Name'])];
+        foreach ($cols as $c) {
+            $fields[] = '"' . $c . '"';
+            $values[] = in_array($c, ['U_Id_Proceso','U_CodRegistro','U_CodRegisto'], true) ? sql_int_or_null($row[$c] ?? null) : sql_q($row[$c] ?? null);
+        }
+
+        try {
+            $pdo->exec(
+                'INSERT INTO "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM" ('
+                . implode(',', $fields)
+                . ') VALUES ('
+                . implode(',', $values)
+                . ')'
+            );
+            api_out([
+                'success' => true,
+                'action' => 'crear',
+                'Code' => $code,
+                'ItemCode' => $row['Name'],
+                'ItemName' => $row['U_ItemNameEq'],
+                'row' => fetch_equipo($pdo, $code),
+                'Fuente' => '@TAMA_EQUIPOS_TM',
+            ]);
+        } catch (Throwable $insertEx) {
+            $lastError = $insertEx;
+            if (strpos($insertEx->getMessage(), 'unique constraint') === false && strpos($insertEx->getMessage(), '301') === false) {
+                throw $insertEx;
+            }
+            usleep(100000 * $attempt);
+        }
+    }
+
+    throw ($lastError ?: new RuntimeException('No se pudo generar un Code unico para el equipo'));
+
+} catch (Throwable $e) {
+    api_out([
+        'success' => false,
+        'error' => '[' . $stage . '] ' . $e->getMessage(),
+        'stage' => $stage,
+        'line' => $e->getLine(),
+    ], 500);
+}

@@ -1,0 +1,46 @@
+API DE ACTIVOS: UN SOLO BACKEND
+
+Todo el backend de Activos esta dentro de api/activos/.
+src/activos/ fue retirado. modules/activos/ contiene las pantallas.
+
+ENTRADAS REST (responden JSON)
+GET    /api/activos/equipos/             Listar equipos
+GET    /api/activos/equipos/?id=123      Obtener un equipo
+POST   /api/activos/equipos/             Registrar equipo
+PUT    /api/activos/equipos/             Actualizar (IdMaquina en JSON)
+DELETE /api/activos/equipos/?id=123      Eliminar equipo
+
+Servicios, aplicaciones, copias, informacion y ubicaciones tienen
+GET para listar y POST/PUT para guardar. El cuerpo indica action
+y los campos de la ficha. Las acciones permitidas estan en
+_interno/comun.php: activos_modulo_operaciones().
+Inventario y renovaciones ofrecen GET para consultas.
+
+Ejemplo: POST /api/activos/servicios/
+Content-Type: application/json
+X-CSRF-Token: token de la sesion
+{
+  "action": "save_service",
+  "IdServicio": 0,
+  "CodigoServicio": "SVC-001",
+  "NombreServicio": "Servicio TI",
+  "TipoServicio": "INTERNO",
+  "EstadoServicio": "ACTIVO",
+  "Confidencialidad": 2,
+  "Integridad": 3,
+  "Disponibilidad": 3,
+  "Clasificacion": "INTERNO"
+}
+
+Las mutaciones requieren sesion, permiso de crear/editar/eliminar
+y token CSRF. Las funciones internas estan en _interno/, protegidas
+contra acceso HTTP directo. Solo las entradas de la API son publicas.
+Los endpoints .php existentes se conservan por compatibilidad.
+Los formularios actuales usan las entradas REST por recurso.
+
+La carga inicial de las pantallas PHP comparte las funciones internas
+de esta misma carpeta. Los formularios consumen los endpoints JSON.
+No hay peticiones HTTP del servidor contra si mismo.
+
+APP_URL y la conexion se configuran en config/settings.php.
+El esquema se verifica con php sql/16_activos_secciones.php --check.

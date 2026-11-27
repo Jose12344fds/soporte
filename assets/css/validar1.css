@@ -1,0 +1,509 @@
+/* ══════════════════════════════════════════════
+   validar1.css
+   CSS extraído de modules/HH_META/validar1.php
+   ══════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════════
+   VARIABLES Y BASE
+   ════════════════════════════════════════════════ */
+:root {
+  --primary: #4e73df;
+  --primary-dark: #3a5bc7;
+  --success: #1cc88a;
+  --warning: #f6c23e;
+  --danger: #e74a3b;
+  --info: #36b9cc;
+  --light: #f8f9fc;
+  --dark: #2c3e50;
+  --card-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15);
+  --grad-primary: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+  --grad-success: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
+  --grad-purple: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --grad-danger: linear-gradient(135deg, #e74a3b 0%, #be2617 100%);
+}
+body { background: var(--light); }
+
+/* ════════════════════════════════════════════════
+   HERO HEADER
+   ════════════════════════════════════════════════ */
+.hero-header {
+  background: var(--grad-primary);
+  padding: 22px 28px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  box-shadow: var(--card-shadow);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.hero-header::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -20%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.04);
+  border-radius: 50%;
+}
+.hero-header h4 { color: #fff; font-weight: 700; margin: 0; font-size: 18px; }
+.hero-header p  { color: rgba(255,255,255,.7); font-size: 13px; margin: 2px 0 0; }
+.hero-badge {
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ════════════════════════════════════════════════
+   CARD PANEL
+   ════════════════════════════════════════════════ */
+.vcard {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.vcard-header {
+  padding: 14px 20px;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e3e6f0;
+}
+.vcard-header.primary  { background: var(--grad-primary); color: #fff; }
+.vcard-header.success  { background: var(--grad-success); color: #fff; }
+.vcard-header.purple   { background: var(--grad-purple);  color: #fff; }
+.vcard-header.danger   { background: var(--grad-danger);  color: #fff; }
+.vcard-body { padding: 16px; }
+
+/* ════════════════════════════════════════════════
+   TABLA PRINCIPAL — Fila seleccionada
+   ════════════════════════════════════════════════ */
+#tblOTs tbody tr { cursor: pointer; transition: background .15s; }
+#tblOTs tbody tr:hover { background: #eaecf4; }
+#tblOTs tbody tr.fila-activa {
+  background: linear-gradient(135deg, #d4efdf 0%, #a9dfbf 100%) !important;
+  font-weight: 600;
+}
+
+/* ════════════════════════════════════════════════
+   SUBCONSULTA — base
+   ════════════════════════════════════════════════ */
+#tblSub th, #tblSub td { padding: 4px 5px; font-size: 11.5px; text-align: center; vertical-align: middle; }
+#tblSub input[type="number"] { width: 60px; text-align: center; font-size: 12px; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+
+/* ════════════════════════════════════════════════
+   PROCESOS ESPECIALES TOGGLE
+   ════════════════════════════════════════════════ */
+.btn-toggle-pe {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  background: var(--grad-danger);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.btn-toggle-pe:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(231,74,59,.35); }
+.btn-toggle-pe.active { background: var(--grad-success); }
+.btn-toggle-pe .icon { transition: transform .3s; }
+.btn-toggle-pe.active .icon { transform: rotate(45deg); }
+.pe-badge {
+  background: rgba(255,255,255,.3);
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+}
+
+/* Color de headers por grupo */
+.th-hab  { background: #2ecc71 !important; color: #000 !important; }
+.th-fab  { background: #faf854 !important; color: #000 !important; }
+.th-acab { background: #5490fa !important; color: #000 !important; }
+.th-pe   { background: #ff6b6b !important; color: #fff !important; }
+.th-tot  { background: #9b59b6 !important; color: #fff !important; }
+
+/* ════════════════════════════════════════════════
+   MODAL EXPORTAR
+   ════════════════════════════════════════════════ */
+.modal-dialog.modal-xl-custom { max-width: 95% !important; width: 95% !important; margin: 20px auto !important; }
+.modal-content.modal-export {
+  border-radius: 15px; border: none;
+  box-shadow: 0 10px 30px rgba(0,0,0,.3);
+}
+.modal-header.export-head {
+  background: var(--grad-purple); color: #fff;
+  border-radius: 15px 15px 0 0;
+  padding: 18px 28px;
+  border-bottom: 2px solid rgba(255,255,255,.2);
+}
+.modal-body.export-body {
+  background: #f8f9fa; padding: 24px;
+  overflow-y: auto; max-height: 75vh;
+}
+.modal-footer.export-foot {
+  background: #f8f9fa; border-top: 2px solid #e9ecef;
+  border-radius: 0 0 15px 15px; padding: 14px 28px;
+}
+
+/* Tablas dentro del modal */
+#tblModalInfo thead th { background: linear-gradient(135deg, #4facfe, #00f2fe); color: #fff; }
+#tblModalItems thead th { background: linear-gradient(135deg, #fa709a, #fee140); color: #fff; }
+#tblModalItems tbody tr { cursor: pointer; transition: all .2s; }
+#tblModalItems tbody tr:hover { background: linear-gradient(135deg, #ffecd2, #fcb69f); }
+#tblModalItems tbody tr.item-activo {
+  background: linear-gradient(135deg, #4facfe, #00f2fe) !important;
+  font-weight: 600;
+  box-shadow: 0 3px 10px rgba(79,172,254,.4);
+}
+
+/* Crossed table */
+#tblCruce thead th { background: linear-gradient(135deg, #a8e6cf, #88d8c0); color: var(--dark); font-size: 12px; }
+#tblCruce tbody td { font-size: 12px; text-align: center; }
+#tblCruce tfoot th { background: var(--grad-purple); color: #fff; font-weight: 700; font-size: 13px; }
+
+/* Botón enviar SAP */
+.btn-enviar-sap {
+  background: linear-gradient(135deg, #fa709a, #fee140);
+  border: none;
+  color: #fff;
+  padding: 10px 24px;
+  border-radius: 25px;
+  font-weight: 600;
+  text-shadow: 1px 1px 2px rgba(0,0,0,.2);
+  box-shadow: 0 4px 15px rgba(0,0,0,.2);
+  transition: all .3s;
+}
+.btn-enviar-sap:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+
+/* Modal SAP: flujo de revision limpio y enfocado */
+#modalExportar { --sap-ink: #123247; --sap-blue: #0b5f78; --sap-green: #15966b; --sap-mist: #eef6f7; }
+#modalExportar .modal-dialog.modal-xl-custom { max-width: 1380px !important; width: calc(100% - 32px) !important; }
+#modalExportar .modal-export { overflow: hidden; border-radius: 18px; box-shadow: 0 24px 70px rgba(18,50,71,.28); }
+#modalExportar .export-head {
+  position: relative; align-items: center; padding: 22px 28px;
+  background: linear-gradient(115deg, #123247 0%, #0b5f78 62%, #178e80 100%);
+  border: 0; border-radius: 0;
+}
+#modalExportar .export-head::after {
+  content: ''; position: absolute; right: 9%; bottom: -46px; width: 170px; height: 100px;
+  border: 22px solid rgba(255,255,255,.07); border-radius: 50%; pointer-events: none;
+}
+.export-title-wrap { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.export-title-icon {
+  width: 52px; height: 52px; flex: 0 0 52px; display: grid; place-items: center;
+  border-radius: 15px; color: #fff; font-size: 23px; background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.22);
+}
+.export-eyebrow { display: block; color: #a8ead7; font-size: 10px; font-weight: 800; letter-spacing: 1.8px; text-transform: uppercase; }
+#modalExportar .modal-title { margin: 2px 0 3px; color: #fff; font-size: 21px; font-weight: 700; letter-spacing: -.25px; }
+.export-title-wrap p { margin: 0; color: rgba(255,255,255,.72); font-size: 12px; }
+#modalExportar .export-close { position: relative; z-index: 1; color: #fff; opacity: .8; text-shadow: none; font-size: 30px; }
+#modalExportar .export-close:hover { opacity: 1; transform: rotate(5deg); }
+#modalExportar .export-body { padding: 22px; background: #edf3f5; max-height: 72vh; }
+#modalExportar .export-body > .row { display: flex; flex-wrap: wrap; margin: 0 -9px; }
+#modalExportar .export-column { display: flex; flex-direction: column; padding: 0 9px; }
+#modalExportar .export-card { margin-bottom: 18px; border: 1px solid #dce7ea; border-radius: 13px; box-shadow: 0 5px 18px rgba(18,50,71,.07); }
+#modalExportar .export-card-review { flex: 1; min-height: 360px; }
+#modalExportar .export-card .vcard-header {
+  min-height: 54px; padding: 11px 16px; background: #fff; color: var(--sap-ink); border-bottom: 1px solid #dfe9ec;
+}
+#modalExportar .export-card .vcard-header small { color: #78909c; font-size: 10px; font-weight: 600; }
+#modalExportar table { border-collapse: separate; border-spacing: 0; }
+#modalExportar table thead th {
+  padding: 10px 8px; color: #4b6675 !important; background: #f4f8f9 !important;
+  border: 0; border-bottom: 1px solid #dce7ea; font-size: 10px; text-transform: uppercase; letter-spacing: .55px;
+}
+#modalExportar table tbody td { padding: 10px 8px; vertical-align: middle; border-color: #edf2f3; color: #294858; }
+#modalExportar #tblModalItems tbody tr:hover { background: #e9f7f2; }
+#modalExportar #tblModalItems tbody tr.item-activo {
+  background: #dff4ec !important; color: #0b654b; box-shadow: inset 4px 0 0 var(--sap-green);
+}
+#modalExportar #tblCruce tfoot th { padding: 11px 8px; background: var(--sap-ink); color: #fff; border: 0; }
+#modalExportar .export-empty-state { min-height: 285px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px !important; color: #78909c; }
+#modalExportar .export-empty-state i { width: 58px; height: 58px; display: grid; place-items: center; margin-bottom: 12px; border-radius: 18px; background: var(--sap-mist); color: var(--sap-blue) !important; font-size: 22px; }
+#modalExportar .export-foot { display: flex; justify-content: space-between; align-items: center; padding: 15px 24px; background: #fff; border-top: 1px solid #dce7ea; border-radius: 0; }
+.export-foot-note { display: flex; align-items: center; gap: 10px; color: var(--sap-green); }
+.export-foot-note > i { font-size: 20px; }
+.export-foot-note span { display: flex; flex-direction: column; text-align: left; }
+.export-foot-note strong { color: var(--sap-ink); font-size: 12px; }
+.export-foot-note small { color: #78909c; font-size: 10px; }
+#modalExportar .btn-enviar-sap {
+  display: inline-flex; align-items: center; gap: 12px; padding: 11px 18px; border-radius: 10px;
+  background: var(--sap-green); color: #fff; font-size: 12px; font-weight: 700; text-shadow: none;
+  box-shadow: 0 5px 14px rgba(21,150,107,.24); transition: transform .18s, box-shadow .18s, background .18s;
+}
+#modalExportar .btn-enviar-sap:hover { background: #107c59; transform: translateY(-1px); box-shadow: 0 7px 18px rgba(21,150,107,.3); }
+#modalExportar .btn-enviar-sap:focus { outline: 3px solid rgba(21,150,107,.22); outline-offset: 2px; }
+
+@media (max-width: 991px) {
+  #modalExportar .export-body > .row { display: block; }
+  #modalExportar .export-card-review { min-height: 300px; }
+}
+@media (max-width: 576px) {
+  #modalExportar .modal-dialog.modal-xl-custom { width: calc(100% - 12px) !important; margin: 6px auto !important; }
+  #modalExportar .export-head { padding: 16px; }
+  .export-title-icon { width: 42px; height: 42px; flex-basis: 42px; font-size: 18px; }
+  #modalExportar .modal-title { font-size: 17px; }
+  .export-title-wrap p, .export-eyebrow { display: none; }
+  #modalExportar .export-body { padding: 12px; max-height: 76vh; }
+  #modalExportar .export-card .vcard-header { align-items: flex-start; flex-direction: column; }
+  #modalExportar .export-foot { gap: 12px; padding: 12px; }
+  .export-foot-note small { display: none; }
+  #modalExportar .btn-enviar-sap { margin-left: auto; white-space: nowrap; }
+}
+
+/* ════════════════════════════════════════════════
+   BADGES
+   ════════════════════════════════════════════════ */
+.badge-estado-proceso {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 11px;
+}
+.badge-estado-proceso.en-proceso { background: var(--warning); color: #000; }
+.badge-estado-proceso.deshabilitado { background: var(--danger); color: #fff; }
+
+/* Botón acción pequeño */
+.btn-acc {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all .2s;
+}
+.btn-acc:hover { transform: translateY(-1px); }
+.btn-acc.correo  { background: #858796; color: #fff; }
+.btn-acc.exportar { background: var(--primary); color: #fff; }
+.btn-acc.cambiar  { background: var(--success); color: #fff; }
+
+/* vertical text for process headers */
+.vtext {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 2px !important;
+  min-width: 35px;
+}
+
+/* ════════════════════════════════════════════════
+   FOOTER FIX — forzar flujo normal, nunca encima
+   ════════════════════════════════════════════════ */
+body .wrapper .main-footer,
+.main-footer {
+  position: static !important;
+  bottom: auto !important;
+  z-index: auto !important;
+}
+/* Espacio al final de la página para que el footer quede abajo */
+.content-wrapper > .container-fluid {
+  padding-bottom: 40px;
+}
+
+/* ════════════════════════════════════════════════
+   BUSCADOR EN FRANJA AZUL (vcard-header primary)
+   ════════════════════════════════════════════════ */
+.v-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 360px;
+  min-width: 160px;
+  margin: 0 12px;
+}
+.v-search-icon {
+  position: absolute;
+  left: 10px;
+  color: rgba(255,255,255,.65);
+  font-size: 13px;
+  pointer-events: none;
+}
+.v-search-input {
+  width: 100%;
+  padding: 6px 32px 6px 30px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(255,255,255,.35);
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  transition: border-color .2s, background .2s;
+}
+.v-search-input::placeholder { color: rgba(255,255,255,.55); }
+.v-search-input:focus {
+  border-color: rgba(255,255,255,.7);
+  background: rgba(255,255,255,.22);
+}
+.v-search-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.7);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+  padding: 0 2px;
+}
+.v-search-clear:hover { color: #fff; }
+.v-header-count {
+  display: inline-block;
+  background: rgba(255,255,255,.2);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.v-header-hint {
+  font-size: 11px;
+  opacity: .7;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════
+   tblSub — DISEÑO RENOVADO (colores por grupo)
+   ════════════════════════════════════════════════ */
+
+/* Wrapper sin clipping vertical para que el footer baje */
+#cardSub .vcard-body {
+  padding: 0 !important;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+/* Columna N° */
+#tblSub td.col-num {
+  font-weight: 800;
+  background: #2c3e50 !important;
+  color: #ecf0f1 !important;
+  width: 28px;
+  min-width: 28px;
+}
+
+/* Columna Descripción */
+#tblSub td.col-desc {
+  text-align: left !important;
+  min-width: 140px;
+  max-width: 170px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #2c3e50;
+  font-weight: 500;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Columnas de info numéricas (CANTI, HH.Ppto, Peso...) */
+#tblSub td.col-info {
+  background: #f0f2f8 !important;
+  color: #34495e;
+  font-weight: 600;
+  font-size: 11px;
+  text-align: right;
+  padding-right: 8px;
+}
+
+/* ── Valor cero: guión discreto ── */
+.val-zero { color: #c8cbcf; font-size: 10px; letter-spacing: .3px; }
+
+/* ── Valor no-cero: badge coloreado por grupo ── */
+.val-pos {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.val-pos-hab  { background: #d4edda; color: #155724; }
+.val-pos-fab  { background: #fff3cd; color: #856404; }
+.val-pos-acab { background: #cce5ff; color: #004085; }
+.val-pos-pe   { background: #f8d7da; color: #721c24; }
+.val-pos-tot  {
+  background: linear-gradient(135deg, #8e44ad, #6c3483);
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  box-shadow: 0 2px 5px rgba(108,52,131,.3);
+}
+
+/* ── Celdas editables: cursor + hover por grupo ── */
+#tblSub td.cell-edit { cursor: cell; }
+#tblSub td.cell-hab:hover  { background: rgba(46,204,113,.12) !important; outline: 1px dashed #27ae60; outline-offset: -1px; }
+#tblSub td.cell-fab:hover  { background: rgba(230,172,0,.13) !important;  outline: 1px dashed #e6ac00; outline-offset: -1px; }
+#tblSub td.cell-acab:hover { background: rgba(61,126,248,.11) !important; outline: 1px dashed #3d7ef8; outline-offset: -1px; }
+#tblSub td.cell-pe:hover   { background: rgba(231,74,59,.10) !important;  outline: 1px dashed #e74a3b; outline-offset: -1px; }
+
+/* ── Celda Total (SUT) ── */
+#tblSub td.cell-total {
+  background: rgba(142,68,173,.07) !important;
+  font-weight: 700;
+}
+
+/* ── Filas alternadas ── */
+#tblSub tbody tr:nth-child(odd)  td { background: #fff; }
+#tblSub tbody tr:nth-child(even) td { background: #f8f9fd; }
+
+/* ── Hover de fila: tinte suave respeta color de grupo ── */
+#tblSub tbody tr:hover td             { background: rgba(78,115,223,.055) !important; }
+#tblSub tbody tr:hover td.cell-hab    { background: rgba(46,204,113,.09)  !important; }
+#tblSub tbody tr:hover td.cell-fab    { background: rgba(230,172,0,.09)   !important; }
+#tblSub tbody tr:hover td.cell-acab   { background: rgba(61,126,248,.09)  !important; }
+#tblSub tbody tr:hover td.cell-pe     { background: rgba(231,74,59,.07)   !important; }
+#tblSub tbody tr:hover td.cell-total  { background: rgba(142,68,173,.10)  !important; }
+#tblSub tbody tr:hover td.col-num     { background: #2c3e50 !important; }
+#tblSub tbody tr:hover td.col-info    { background: #e8eaf4 !important; }
+
+/* ── Separadores verticales entre grupos ── */
+/* Columna 7  = inicio HABILITADO   */
+#tblSub tbody td:nth-child(7),
+#tblSub thead tr:last-child th:nth-child(7)  { border-left: 3px solid #27ae60 !important; }
+/* Columna 11 = inicio FABRICACIÓN  */
+#tblSub tbody td:nth-child(11),
+#tblSub thead tr:last-child th:nth-child(11) { border-left: 3px solid #e6ac00 !important; }
+/* Columna 22 = inicio ACABADOS     */
+#tblSub tbody td:nth-child(22),
+#tblSub thead tr:last-child th:nth-child(22) { border-left: 3px solid #3d7ef8 !important; }
+/* Columna 26 = inicio PROC.ESP.    */
+#tblSub tbody td:nth-child(26),
+#tblSub thead tr:last-child th:nth-child(26) { border-left: 3px solid #e74a3b !important; }
+/* Columna 30 = TOTAL               */
+#tblSub tbody td:nth-child(30),
+#tblSub thead tr:last-child th:nth-child(30) { border-left: 3px solid #9b59b6 !important; }
+
+/* ── Headers de grupo: padding y sombra inferior ── */
+.th-hab, .th-fab, .th-acab, .th-pe, .th-tot {
+  box-shadow: 0 3px 0 rgba(0,0,0,.12);
+}
+
+/* ── Hint de "sin datos" ── */
+#subHint { padding: 36px 0; }
+#subHint i { color: #c8cbcf; }
+#subHint p { color: #adb5bd; font-size: 13px; }

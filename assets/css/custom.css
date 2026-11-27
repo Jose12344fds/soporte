@@ -1,0 +1,271 @@
+/**
+ * Custom CSS - Estilos personalizados
+ * Sistema de Soporte TI v2.0
+ */
+
+/* ===== Variables CSS ===== */
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+    --sidebar-width: 250px;
+}
+
+/* ===== Preloader ===== */
+.preloader {
+    background-color: #f4f6f9;
+}
+
+/* ===== Sidebar Customization ===== */
+.main-sidebar {
+    box-shadow: 0 14px 28px rgba(0,0,0,.25), 0 10px 10px rgba(0,0,0,.22);
+}
+
+.brand-link {
+    border-bottom: 1px solid rgba(255,255,255,.1);
+}
+
+.brand-text {
+    font-size: 1rem;
+}
+
+.nav-sidebar .nav-link {
+    border-radius: 0;
+    margin-bottom: 0;
+}
+
+.nav-sidebar .nav-link.active {
+    background-color: rgba(255,255,255,.1);
+    color: #fff;
+}
+
+/* ===== Content Area ===== */
+.content-wrapper {
+    background-color: #f4f6f9;
+}
+
+.content-header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+/* ===== Cards ===== */
+.card {
+    border: none;
+    border-radius: .5rem;
+    box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+    margin-bottom: 1rem;
+}
+
+.card-header {
+    background-color: transparent;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    padding: 1rem 1.25rem;
+}
+
+.card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0;
+}
+
+/* ===== Tables ===== */
+.table thead th {
+    border-top: none;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* ===== Buttons ===== */
+.btn {
+    border-radius: .25rem;
+    font-weight: 500;
+}
+
+.btn-group-sm > .btn, .btn-sm {
+    padding: .25rem .5rem;
+    font-size: .875rem;
+}
+
+.btn i {
+    margin-right: .25rem;
+}
+
+.btn-group .btn i {
+    margin-right: 0;
+}
+
+/* ===== Forms ===== */
+.form-control {
+    border-radius: .25rem;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.form-group label {
+    font-weight: 500;
+    margin-bottom: .5rem;
+}
+
+.required::after {
+    content: ' *';
+    color: var(--danger-color);
+}
+
+/* ===== Badges ===== */
+.badge {
+    font-weight: 500;
+    padding: .4em .6em;
+}
+
+/* ===== Alerts ===== */
+.alert {
+    border: none;
+    border-radius: .25rem;
+}
+
+/* ===== DataTables ===== */
+.dataTables_wrapper .dataTables_length select {
+    padding: .25rem 1.75rem .25rem .5rem;
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    margin-left: .5rem;
+    border-radius: .25rem;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    padding: .25rem .5rem;
+    margin-left: .25rem;
+}
+
+div.dataTables_wrapper div.dataTables_processing {
+    background: rgba(255,255,255,.9);
+    border: none;
+    border-radius: .5rem;
+    box-shadow: 0 0 10px rgba(0,0,0,.1);
+}
+
+/* ===== Small Info Boxes ===== */
+.small-box {
+    border-radius: .5rem;
+}
+
+.small-box h3 {
+    font-size: 2rem;
+}
+
+.small-box .icon {
+    top: 10px;
+    right: 15px;
+}
+
+.small-box .icon > i {
+    font-size: 60px;
+}
+
+/* ===== Modal ===== */
+.modal-header {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-footer {
+    border-top: 1px solid #dee2e6;
+}
+
+/* ===== Utilities ===== */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.text-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.hover-shadow:hover {
+    box-shadow: 0 4px 25px 0 rgba(0,0,0,.1);
+    transition: all .3s ease;
+}
+
+/* ===== Loading Overlay ===== */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255,255,255,.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+/* ===== Print Styles ===== */
+@media print {
+    .main-sidebar,
+    .main-header,
+    .main-footer,
+    .btn,
+    .no-print {
+        display: none !important;
+    }
+    
+    .content-wrapper {
+        margin-left: 0 !important;
+        background: #fff !important;
+    }
+    
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+    }
+}
+
+/* ===== Responsive Adjustments ===== */
+/* Footer — AdminLTE 3.2 usa position:fixed por defecto, lo revertimos a flujo normal */
+.main-footer {
+    position: static !important;
+}
+
+/* AdminLTE pone height:100% en .content-wrapper, lo que fija su altura al viewport.
+   Cuando tblSub carga muchas filas (paging:false), los rows desbordan ese contenedor
+   y el footer queda "en medio" de las filas. height:auto permite que el contenedor
+   crezca con su contenido y el footer siempre baje debajo de todo. */
+.content-wrapper {
+    height: auto !important;
+}
+
+@media (max-width: 768px) {
+    .content-header h1 {
+        font-size: 1.25rem;
+    }
+    
+    .small-box h3 {
+        font-size: 1.5rem;
+    }
+    
+    .btn-group-responsive {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .btn-group-responsive .btn {
+        margin-bottom: .25rem;
+    }
+}

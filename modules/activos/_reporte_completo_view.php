@@ -1,0 +1,29 @@
+<?php
+if (!isset($reportTitle,$reportSubtitle,$excelHref,$backHref,$reportTables)) throw new RuntimeException('Configuración de reporte incompleta.');
+$rh = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+?>
+<style>
+.lr-shell{--lr-navy:#173a5e;--lr-teal:#087f8c;--lr-line:#d4e0e5}.lr-doc{display:grid;grid-template-columns:170px 1fr 260px;min-height:90px;border:1px solid #273943;background:#fff;box-shadow:0 7px 22px rgba(20,48,64,.08)}.lr-logo{display:flex;align-items:center;justify-content:center;border-right:1px solid #273943}.lr-logo img{max-width:135px;max-height:68px}.lr-title{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.lr-title strong{font-size:16px;color:#172f43}.lr-title span{margin-top:8px;font-size:13px;font-weight:800;color:#087f8c}.lr-meta{display:grid;grid-template-columns:90px 1fr;border-left:1px solid #273943;font-size:10px}.lr-meta b,.lr-meta span{display:flex;align-items:center;justify-content:center;padding:4px;border-bottom:1px solid #84959e}.lr-meta b{background:#eef3f5}.lr-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--lr-line);border-top:0;background:#fff}.lr-tabs{padding:7px;border:1px solid var(--lr-line);border-radius:12px;background:#fff}.lr-tabs .nav-link{border-radius:8px;color:#506a76;font-size:11px;font-weight:800}.lr-tabs .nav-link.active{background:var(--lr-teal)}.lr-card{border:0;border-radius:13px;overflow:hidden;box-shadow:0 7px 22px rgba(20,48,64,.08)}.lr-card .card-header{background:#fff}.lr-table{font-size:10px}.lr-table thead th{background:var(--lr-navy);color:#fff;border-color:#31536a;white-space:nowrap;text-align:center;vertical-align:middle;font-size:9px}.lr-table tbody td{vertical-align:middle}.lr-card .dataTables_wrapper{padding:0 12px 12px}.lr-card .dataTables_scroll{border:1px solid #d7e2e6}.lr-card .dataTables_filter input,.lr-card .dataTables_length select{height:31px;border:1px solid #c9d8de;border-radius:7px}.lr-card .dataTables_info,.lr-card .dataTables_paginate,.lr-card .dataTables_length,.lr-card .dataTables_filter{font-size:11px}.lr-count{display:inline-flex;min-width:26px;height:22px;align-items:center;justify-content:center;margin-left:5px;border-radius:11px;background:#edf4f5;color:#087f8c}@media(max-width:850px){.lr-doc{grid-template-columns:1fr}.lr-logo,.lr-meta{border:0;border-bottom:1px solid #84959e}.lr-logo,.lr-title{padding:10px}.lr-actions{align-items:flex-start;flex-direction:column}}
+</style>
+<section class="content-header pb-1"><div class="container-fluid"><div class="d-flex justify-content-between align-items-center"><h1 class="h5 mb-0"><i class="fas fa-file-alt mr-2 text-info"></i><?= $rh($reportTitle) ?></h1><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="index.php">Activos</a></li><li class="breadcrumb-item active">Reporte completo</li></ol></div></div></section>
+<section class="content lr-shell"><div class="container-fluid">
+  <div class="lr-doc">
+    <div class="lr-logo"><img src="<?= $rh(rtrim(ASSETS_URL,'/')) ?>/img/logo.png" alt="TAMA Ingenieros S.A.C."></div>
+    <div class="lr-title"><strong>SISTEMA INTEGRADO DE GESTI&Oacute;N</strong><span><?= $rh(mb_strtoupper($reportTitle,'UTF-8')) ?></span></div>
+    <div class="lr-meta"><b>Fecha</b><span><?=date('d/m/Y')?></span><b>Versi&oacute;n</b><span>01</span><b>Responsable</b><span>TI</span></div>
+  </div>
+  <div class="lr-actions mb-3"><div><strong><?= $rh($reportTitle) ?></strong><small class="d-block text-muted"><?= $rh($reportSubtitle) ?></small></div><div><a href="<?= $rh($backHref) ?>" class="btn btn-outline-secondary btn-sm mr-1"><i class="fas fa-arrow-left mr-1"></i>Volver</a><a href="<?= $rh($excelHref) ?>" target="_blank" class="btn btn-outline-success btn-sm font-weight-bold"><i class="fas fa-database mr-1"></i>Excel Data Completa</a></div></div>
+  <ul class="nav nav-pills lr-tabs mb-3" role="tablist">
+    <?php foreach($reportTables as $i=>$table):?><li class="nav-item"><a class="nav-link <?=$i===0?'active':''?>" data-toggle="pill" href="#lrTab<?=$i?>"><i class="fas <?= $rh($table['icon']??'fa-table') ?> mr-1"></i><?= $rh($table['label']) ?><span class="lr-count"><?=count($table['rows'])?></span></a></li><?php endforeach;?>
+  </ul>
+  <div class="tab-content">
+    <?php foreach($reportTables as $i=>$table):?><div class="tab-pane fade <?=$i===0?'show active':''?>" id="lrTab<?=$i?>"><div class="card lr-card"><div class="card-header"><strong><?= $rh($table['title']??$table['label']) ?></strong><small class="d-block text-muted">Todos los campos registrados, incluidos identificadores y fechas de control.</small></div><div class="card-body p-0"><table id="lrTable<?=$i?>" class="table table-striped table-hover table-bordered lr-table full-report-table w-100"><thead><tr><?php foreach($table['columns'] as $column):?><th><?= $rh($column['label']) ?></th><?php endforeach;?></tr></thead><tbody><?php foreach($table['rows'] as $row):?><tr><?php foreach($table['columns'] as $column):$value=$row[$column['key']]??'';if(($column['type']??'')==='boolean')$value=((string)$value==='1'?'SÍ':'NO');?><td><?= $rh($value) ?></td><?php endforeach;?></tr><?php endforeach;?></tbody></table></div></div></div><?php endforeach;?>
+  </div>
+</div></section>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  var reportTables=[];
+  $('.full-report-table').each(function(){reportTables.push($(this).DataTable({language:DATATABLES_SPANISH,pageLength:25,lengthMenu:[[10,25,50,100,-1],[10,25,50,100,'Todos']],order:[],responsive:false,scrollX:true,autoWidth:false,dom:'<"d-flex justify-content-between align-items-center flex-wrap py-2"lf>rt<"d-flex justify-content-between align-items-center flex-wrap pt-3"ip>'}))});
+  $('.lr-tabs a[data-toggle="pill"]').on('shown.bs.tab',function(){reportTables.forEach(function(table){table.columns.adjust()})});
+});
+</script>

@@ -1,0 +1,169 @@
+MANTENIMIENTO TI - TABLAS MYSQL RELACIONADAS
+=============================================
+
+MODULO
+------
+modules/mantenimiento_ti/
+
+RELACION PRINCIPAL
+------------------
+maquina.IdMaquina
+  -> activos_mantenimiento_planes.IdMaquina
+  -> activos_mantenimiento_ocurrencias.plan_id
+  -> activos_mantenimiento_ocurrencias.mantenimiento_id
+  -> activos_mantenimientos.id
+
+1. maquina
+----------
+Proposito: maestro de equipos/activos TI.
+Llave: IdMaquina.
+Campos usados: IdMaquina, Host, Tipo_Activo, EstadoMaquina.
+Relaciona con:
+  - activos_mantenimiento_planes.IdMaquina
+  - activos_mantenimientos.IdMaquina
+  - asig_maquina.IdMaquina
+
+2. activos_mantenimiento_planes
+--------------------------------
+Proposito: plan maestro por equipo.
+Llave: id.
+Campos:
+  id, codigo, IdMaquina, nombre, tipo, prioridad,
+  frecuencia, intervalo, unidad_intervalo,
+  fecha_inicio, primera_fecha_programada, fecha_fin,
+  instruccion, tecnico_predeterminado,
+  generar_automatico, activo, ultima_fecha_generada,
+  creado_por, actualizado_por, created_at, updated_at.
+Relacion:
+  IdMaquina -> maquina.IdMaquina
+  id -> activos_mantenimiento_ocurrencias.plan_id
+Codigo: MTIP-000001.
+
+3. activos_mantenimiento_ocurrencias
+------------------------------------
+Proposito: cada fecha programada generada desde un plan.
+Llave: id.
+Campos:
+  id, codigo, plan_id, mantenimiento_id,
+  fecha_original, fecha_programada, estado,
+  observacion, tecnico_responsable, motivo_cancelacion,
+  creado_por, actualizado_por, created_at, updated_at.
+Relacion:
+  plan_id -> activos_mantenimiento_planes.id
+  mantenimiento_id -> activos_mantenimientos.id
+  id -> activos_mantenimiento_ocurrencia_historial.ocurrencia_id
+Reglas:
+  - UNIQUE(plan_id, fecha_original): una fecha original por plan.
+  - UNIQUE(mantenimiento_id): una ocurrencia solo puede tener una OT.
+  - Aqui esta el amarre real entre plan y orden.
+Codigo: MTIO-0000001.
+Estados: PENDIENTE, GENERANDO_OT, OT_GENERADA, EJECUTADA, CANCELADA, VENCIDA.
+
+4. activos_mantenimientos
+--------------------------
+Proposito: orden de trabajo TI; esta es la tabla que se llena en el formulario.
+Llave: id.
+Campos usados:
+  id, folio, IdMaquina, tipo, prioridad, estado,
+  fecha_programada, fecha_ejecucion,
+  motivo, diagnostico, trabajo_realizado,
+  tecnico_responsable, usuario_asignado_id, usuario_asignado_nombre,
+  creado_por, actualizado_por, foto_antes, foto_despues.
+Relacion:
+  IdMaquina -> maquina.IdMaquina
+  id <- activos_mantenimiento_ocurrencias.mantenimiento_id
+  id <- activos_mantenimiento_detalle.mantenimiento_id
+  id <- activos_mantenimiento_historial.mantenimiento_id
+Codigo: MTI-AAAA-000001.
+Importante:
+  No se guarda plan_id directamente en esta tabla.
+  El plan se obtiene por ocurrencias.mantenimiento_id y ocurrencias.plan_id.
+
+5. activos_mantenimiento_ocurrencia_historial
+----------------------------------------------
+Proposito: auditoria de las programaciones.
+Llave: id.
+Campos:
+  id, ocurrencia_id, accion, fecha_anterior, fecha_nueva,
+  estado_anterior, estado_nuevo, comentario, registrado_por, created_at.
+Relacion:
+  ocurrencia_id -> activos_mantenimiento_ocurrencias.id
+  registrado_por -> users.id.
+Acciones: GENERACION, VINCULAR_OT, GENERAR_OT, SINCRONIZAR_OT.
+
+6. activos_mantenimiento_detalle
+--------------------------------
+Proposito: repuestos, materiales, servicios o items utilizados en una OT.
+Relacion:
+  mantenimiento_id -> activos_mantenimientos.id.
+Campos usados:
+  mantenimiento_id, cantidad, costo_unitario, creado_por.
+
+7. activos_mantenimiento_historial
+-----------------------------------
+Proposito: auditoria de la orden TI.
+Relacion:
+  mantenimiento_id -> activos_mantenimientos.id
+  registrado_por -> users.id.
+
+8. asig_maquina
+---------------
+Proposito: responsables asignados a los equipos.
+Relacion:
+  IdMaquina -> maquina.IdMaquina
+  id -> users.id.
+
+9. users
+--------
+Proposito: usuarios del sistema de soporte.
+Relaciona con los campos creado_por, actualizado_por y registrado_por de:
+  activos_mantenimientos,
+  activos_mantenimiento_planes,
+  activos_mantenimiento_ocurrencias,
+  activos_mantenimiento_ocurrencia_historial,
+  activos_mantenimiento_historial,
+  activos_mantenimiento_detalle.
+Tambien se relaciona con asig_maquina.id.
+
+CONSULTA PARA VER EL AMARRE COMPLETO
+------------------------------------
+SELECT
+    m.id AS orden_id,
+    m.folio AS orden_folio,
+    m.estado AS orden_estado,
+    q.Host AS equipo,
+    o.id AS ocurrencia_id,
+    o.codigo AS ocurrencia_codigo,
+    o.estado AS ocurrencia_estado,
+    o.fecha_original,
+    o.fecha_programada AS fecha_ocurrencia,
+    p.id AS plan_id,
+    p.codigo AS plan_codigo,
+    p.nombre AS plan_nombre
+FROM activos_mantenimientos m
+INNER JOIN maquina q
+    ON q.IdMaquina = m.IdMaquina
+LEFT JOIN activos_mantenimiento_ocurrencias o
+    ON o.mantenimiento_id = m.id
+LEFT JOIN activos_mantenimiento_planes p
+    ON p.id = o.plan_id
+ORDER BY m.id DESC;
+
+CONSULTA DE OCURRENCIAS SIN ORDEN
+---------------------------------
+SELECT
+    o.id AS ocurrencia_id,
+    o.codigo AS ocurrencia_codigo,
+    o.fecha_programada,
+    o.estado,
+    p.codigo AS plan_codigo,
+    p.nombre AS plan_nombre,
+    q.Host AS equipo
+FROM activos_mantenimiento_ocurrencias o
+INNER JOIN activos_mantenimiento_planes p
+    ON p.id = o.plan_id
+INNER JOIN maquina q
+    ON q.IdMaquina = p.IdMaquina
+WHERE o.mantenimiento_id IS NULL
+ORDER BY o.fecha_programada, q.Host;
+

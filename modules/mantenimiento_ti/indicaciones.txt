@@ -1,0 +1,126 @@
+# IMPLEMENTACIÓN DE REPORTE INDEPENDIENTE DE MANTENIMIENTO PREVENTIVO
+
+## 1. Objetivo
+
+Implementar un reporte independiente de cumplimiento del mantenimiento preventivo de los equipos, accesible mediante un botón dentro del módulo de mantenimiento.
+
+El reporte deberá abrirse en un modal de gran tamaño, sin reemplazar ni modificar la pantalla actual de programación de mantenimientos.
+
+El propósito es visualizar, controlar y evaluar el cumplimiento de los mantenimientos preventivos programados durante un año, identificando los trabajos ejecutados, pendientes y futuros.
+
+## 2. Ubicación y acceso
+
+Agregar un botón denominado **«Reporte de cumplimiento»** en la parte superior de la pantalla principal del módulo de mantenimiento preventivo.
+
+Al hacer clic, deberá abrirse un modal independiente que contenga toda la información del reporte.
+
+Características del modal:
+- Tamaño amplio, preferentemente entre 90 % y 95 % del ancho de pantalla.
+- Altura aproximada del 90 % de la pantalla.
+- Contenido organizado y con desplazamiento interno.
+- Botón para cerrar y regresar a la pantalla anterior.
+- Diseño profesional, siguiendo los estilos visuales existentes en el sistema.
+
+## 3. Filtros de consulta
+
+El reporte deberá permitir filtrar la información por:
+
+- Año de mantenimiento.
+- Tipo de equipo.
+- Frecuencia de mantenimiento.
+- Sede o ubicación.
+
+Los filtros deberán actualizar automáticamente los indicadores y las tablas del reporte.
+
+## 4. Indicadores principales (KPI)
+
+Mostrar tarjetas con los siguientes indicadores:
+
+1. **Mantenimientos programados:** cantidad total de ocurrencias previstas para el periodo.
+2. **Mantenimientos ejecutados:** cantidad de ocurrencias que fueron efectivamente completadas.
+3. **Mantenimientos pendientes:** ocurrencias cuya fecha programada ya venció y todavía no han sido ejecutadas.
+4. **Mantenimientos futuros:** ocurrencias cuya fecha programada todavía no ha llegado.
+5. **Porcentaje de cumplimiento:** porcentaje de mantenimientos ejecutados respecto de las ocurrencias exigibles a la fecha.
+
+Fórmula de cumplimiento a la fecha:
+
+Cumplimiento (%) = Mantenimientos ejecutados / (Mantenimientos ejecutados + Mantenimientos pendientes vencidos) × 100.
+
+También mostrar el avance respecto del total de mantenimientos programados para el año, incluyendo las ocurrencias futuras.
+
+## 5. Clasificación de los mantenimientos
+
+El reporte deberá respetar las siguientes frecuencias:
+
+| Grupo de equipos | Frecuencia | Ocurrencias anuales |
+|---|---|---:|
+| PC administrativas | Cuatrimestral | 3 |
+| PC fuera de la empresa | Anual | 1 |
+| Servidores | Anual | 1 |
+
+Cada equipo deberá mostrar sus respectivas ocurrencias de mantenimiento durante el periodo seleccionado.
+
+## 6. Tabla de detalle
+
+Incorporar una tabla que permita visualizar:
+
+- Año.
+- Tipo de equipo.
+- Nombre o código del equipo.
+- Sede o ubicación.
+- Número de ocurrencia.
+- Fecha programada.
+- Fecha de ejecución.
+- Orden de trabajo asociada.
+- Técnico responsable.
+- Estado del mantenimiento.
+- Observaciones.
+
+Los estados deberán diferenciarse visualmente:
+
+- Completado.
+- Pendiente.
+- Futuro.
+
+El estado completado debe determinarse por la ejecución real y cierre del mantenimiento, no solamente por la generación de una orden de trabajo.
+
+## 7. Resumen por tipo de equipo
+
+Incorporar una tabla consolidada que permita comparar el cumplimiento por grupo de equipos.
+
+Mostrar:
+- Total de ocurrencias programadas.
+- Total ejecutado.
+- Total pendiente.
+- Total futuro.
+- Porcentaje de cumplimiento.
+- Porcentaje de avance anual.
+
+## 8. Consideraciones técnicas importantes
+
+- Utilizar como fuente principal la tabla existente `activos_mantenimiento_ocurrencias`.
+- Relacionar las ocurrencias con sus respectivas órdenes de trabajo.
+- Identificar cada mantenimiento mediante su año, equipo y número de ocurrencia.
+- Evitar contabilizar dos veces una misma ocurrencia.
+- Considerar el estado real de ejecución y no únicamente la existencia de una orden de trabajo.
+- Los checklists y hallazgos deben considerarse información complementaria, no el criterio principal para contabilizar el cumplimiento.
+- Reutilizar las tablas, relaciones, consultas y componentes existentes cuando corresponda.
+
+## 9. Restricciones de implementación
+
+**IMPORTANTE: No modificar la lógica actual del sistema.**
+
+- No modificar la programación anual de mantenimiento.
+- No modificar la generación de ocurrencias.
+- No modificar las órdenes de trabajo.
+- No alterar las frecuencias establecidas.
+- No crear tablas duplicadas si la información ya existe.
+- No cambiar el funcionamiento de las pantallas actuales.
+
+El desarrollo debe concentrarse exclusivamente en incorporar el nuevo reporte independiente mediante un modal.
+
+## 10. Resultado esperado
+
+Contar con un reporte profesional que permita conocer rápidamente cuánto mantenimiento preventivo se ha programado, cuánto se ha ejecutado, qué trabajos están pendientes y cuál es el nivel de cumplimiento por tipo de equipo y por año.
+
+El reporte debe funcionar como una herramienta de control y evaluación de la gestión del mantenimiento preventivo, sin interferir con el flujo operativo existente.

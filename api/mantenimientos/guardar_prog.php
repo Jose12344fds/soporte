@@ -1,0 +1,1261 @@
+<?php
+/**
+ * API: Guardar Programacion de Mantenimiento
+ * - @TAMA_PROGMANT = plan maestro
+ * - @TAMA_PROGDET  = ocurrencias por periodo
+ */
+ob_start();
+error_reporting(0);
+ini_set('display_errors', 0);
+header('Content-Type: application/json; charset=utf-8');
+
+require_once __DIR__ . '/conexion_hana.php';
+require_once dirname(dirname(__DIR__)) . '/includes/load.php';
+
+function prog_log_path(): string {
+    $dir = __DIR__ . '/logs';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0777, true);
+    }
+    return $dir . '/guardar_prog.log';
+}
+
+function prog_log(string $message, array $context = []): void {
+    $line = '[' . date('Y-m-d H:i:s') . '] ' . $message;
+    if ($context) {
+        $json = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+        $line .= ' | ' . $json;
+    }
+    @file_put_contents(prog_log_path(), $line . PHP_EOL, FILE_APPEND);
+}
+
+function prog_fail_generation(PDO $pdo, string $message, array $context = []): void {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    prog_log($message, $context);
+    prog_out(['error' => 'No se generaron las ocurrencias de la programacion. No se guardo el plan.'], 500);
+}
+
+function prog_out(array $data, int $status = 200): void {
+    while (ob_get_level()) { ob_end_clean(); }
+    http_response_code($status);
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
+
+function prog_v($v): string {
+    return trim((string)($v ?? ''));
+}
+
+function prog_nullable(string $value): ?string {
+    return $value !== '' ? $value : null;
+}
+
+function prog_bool_flag($value, string $default = 'Y'): string {
+    $v = strtoupper(prog_v($value));
+    if ($v === '') return $default;
+    return in_array($v, ['Y', 'N'], true) ? $v : $default;
+}
+
+function prog_periodo_tipo(string $frecuencia): string {
+    $map = [
+        'ANUAL' => 'ANUAL',
+        'BIENAL' => 'BIENAL',
+        'SEMESTRAL' => 'SEMESTRAL',
+        'TRIMESTRAL' => 'TRIMESTRAL',
+        'BIMENSUAL' => 'BIMENSUAL',
+        'MENSUAL' => 'MENSUAL',
+        'QUINCENAL' => 'QUINCENAL',
+        'SEMANAL' => 'SEMANAL',
+    ];
+    $key = strtoupper(prog_v($frecuencia));
+    return $map[$key] ?? $key;
+}
+
+function prog_next_code(PDO $pdo): string {
+    $row = $pdo->query(
+        'SELECT COALESCE(MAX(CAST(SUBSTRING("Code", 4) AS INTEGER)), 0) + 1 AS "NXT"'
+        . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+        . " WHERE \"Code\" LIKE_REGEXPR '^PM-[0-9]+$'"
+    )->fetch();
+    $next = (int)($row['NXT'] ?? array_values($row)[0] ?? 1);
+    return 'PM-' . str_pad((string)$next, 4, '0', STR_PAD_LEFT);
+}
+
+function prog_next_docentry(PDO $pdo, string $table): int {
+    $row = $pdo->query(
+        'SELECT COALESCE(MAX("DocEntry"), 0) + 1 AS "NXT"'
+        . ' FROM "SBO_TAMAING_PRODUC".' . $table
+    )->fetch();
+    return (int)($row['NXT'] ?? array_values($row)[0] ?? 1);
+}
+
+function prog_name_exists(PDO $pdo, string $name, string $exceptCode = ''): bool {
+    $sql = 'SELECT COUNT(*) AS "CNT" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT" WHERE "Name" = ?';
+    $params = [$name];
+    if ($exceptCode !== '') {
+        $sql .= ' AND "Code" <> ?';
+        $params[] = $exceptCode;
+    }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $row = $stmt->fetch();
+    return ((int)($row['CNT'] ?? array_values($row)[0] ?? 0)) > 0;
+}
+
+function prog_unique_name(PDO $pdo, string $name, string $code): string {
+    $base = prog_v($name);
+    if ($base === '') $base = $code;
+    if (!prog_name_exists($pdo, $base, $code)) return $base;
+    for ($i = 1; $i <= 50; $i++) {
+        $suffix = $i === 1 ? " [{$code}]" : " [{$code}-{$i}]";
+        $limit = max(1, 100 - strlen($suffix));
+        $candidate = substr($base, 0, $limit) . $suffix;
+        if (!prog_name_exists($pdo, $candidate, $code)) return $candidate;
+    }
+    return substr($code . ' ' . $base, 0, 100);
+}
+
+function prog_equipo_info(PDO $pdo, string $itemcode): ?array {
+    $stmt = $pdo->prepare(
+        'SELECT TOP 1 "Name","U_ItemNameEq","U_Estado"'
+        . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM" WHERE "Name" = ?'
+    );
+    $stmt->execute([$itemcode]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row ?: null;
+}
+
+function prog_assert_equipo_programable(PDO $pdo, string $itemcode): void {
+    $equipo = prog_equipo_info($pdo, $itemcode);
+    if (!$equipo) {
+        prog_out(['error' => 'El equipo ' . $itemcode . ' no existe en SAP.'], 404);
+    }
+    if (strtoupper(prog_v($equipo['U_Estado'] ?? '')) === 'DE BAJA') {
+        prog_out([
+            'error' => 'No se puede programar el equipo ' . $itemcode . ' porque su estado es DE BAJA.',
+            'equipo_estado' => 'DE BAJA',
+        ], 409);
+    }
+}
+
+function prog_fetch_plan(PDO $pdo, string $code): ?array {
+    $stmt = $pdo->prepare(
+        'SELECT * FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT" WHERE "Code" = ?'
+    );
+    $stmt->execute([$code]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+function prog_build_plan_context(
+    string $code,
+    string $name,
+    string $itemcode,
+    string $tipomant,
+    string $modalidad,
+    string $fechaProg,
+    string $frecuencia,
+    string $estado,
+    string $observ,
+    string $fechaInicioPlan,
+    string $fechaFinPlan,
+    string $generaAuto,
+    int $anioBase,
+    string $tipoPeriodo,
+    string $ultPeriodoGen,
+    string $critico,
+    string $activo
+): array {
+    return [
+        'Code' => $code,
+        'Name' => $name,
+        'U_ItemCode' => $itemcode,
+        'U_TipoMant' => $tipomant,
+        'U_FechaProg' => $fechaProg !== '' ? $fechaProg : $fechaInicioPlan,
+        'U_Modalidad' => $modalidad,
+        'U_Frecuencia' => $frecuencia,
+        'U_Estado' => $estado,
+        'U_Observacion' => $observ,
+        'U_FechaInicioPlan' => $fechaInicioPlan,
+        'U_FechaFinPlan' => $fechaFinPlan,
+        'U_GeneraAuto' => $generaAuto,
+        'U_AnioBase' => (string)$anioBase,
+        'U_TipoPeriodo' => $tipoPeriodo,
+        'U_UltPeriodoGen' => $ultPeriodoGen,
+        'U_Critico' => $critico,
+        'U_Activo' => $activo,
+    ];
+}
+
+function prog_fetch_occurrence(PDO $pdo, string $code): ?array {
+    $stmt = $pdo->prepare(
+        'SELECT * FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET" WHERE "Code" = ?'
+    );
+    $stmt->execute([$code]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+function prog_next_occurrence_code(PDO $pdo): string {
+    $row = $pdo->query(
+        'SELECT COALESCE(MAX(CAST(SUBSTRING("Code", 4) AS INTEGER)), 0) + 1 AS "NXT"'
+        . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+        . " WHERE \"Code\" LIKE_REGEXPR '^PRD[0-9]+$'"
+    )->fetch();
+    $next = (int)($row['NXT'] ?? array_values($row)[0] ?? 1);
+    return 'PRD' . str_pad((string)$next, 7, '0', STR_PAD_LEFT);
+}
+
+function prog_sync_plan_next_date(PDO $pdo, string $planCode, string $nowDate, int $nowTime): void {
+    $stmt = $pdo->prepare(
+        'SELECT MIN("U_FechaProg") AS "NEXT_DATE", MAX("U_PeriodoNum") AS "LAST_PERIOD"'
+        . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+        . ' WHERE "U_ProgMant" = ? AND COALESCE("U_Estado", \'Pendiente\') IN (\'Pendiente\', \'Vencido\')'
+    );
+    $stmt->execute([$planCode]);
+    $row = $stmt->fetch() ?: [];
+    $nextDate = prog_v($row['NEXT_DATE'] ?? '');
+    $lastPeriod = isset($row['LAST_PERIOD']) ? (int)$row['LAST_PERIOD'] : 0;
+
+    $upd = $pdo->prepare(
+        'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+        . ' SET "U_FechaProg" = ?, "U_UltPeriodoGen" = ?, "UpdateDate" = ?, "UpdateTime" = ?'
+        . ' WHERE "Code" = ?'
+    );
+    $upd->execute([
+        $nextDate !== '' ? substr($nextDate, 0, 10) : null,
+        $lastPeriod > 0 ? (string)$lastPeriod : null,
+        $nowDate,
+        $nowTime,
+        $planCode,
+    ]);
+}
+
+function prog_weekly_periods_from_calendar(int $anioBase, string $fechaInicioPlan, string $fechaFinPlan): array {
+    $inicio = new DateTime($fechaInicioPlan);
+    $fin = $fechaFinPlan !== '' ? new DateTime($fechaFinPlan) : new DateTime(sprintf('%04d-12-31', $anioBase));
+    $finAnio = new DateTime(sprintf('%04d-12-31', $anioBase));
+    if ($fin > $finAnio) $fin = $finAnio;
+
+    $inicioSql = $inicio->format('Y-m-d');
+    $finSql = $fin->format('Y-m-d');
+    $rows = find_by_sql(
+        "SELECT YEAR(fecha) AS anio, semana, MIN(Mes) AS mes, MIN(fecha) AS fecha_inicio, MAX(fecha) AS fecha_fin
+         FROM dias_del_anio
+         WHERE YEAR(fecha) = " . (int)$anioBase . "
+         GROUP BY YEAR(fecha), semana
+         HAVING MAX(fecha) >= '" . $inicioSql . "' AND MIN(fecha) <= '" . $finSql . "'
+         ORDER BY MIN(fecha)"
+    );
+
+    if (!$rows) {
+        prog_log('calendario_semanal_sin_cobertura', [
+            'anio' => $anioBase,
+            'inicio' => $inicioSql,
+            'fin' => $finSql,
+        ]);
+        return [];
+    }
+
+    $periods = [];
+    foreach ($rows as $index => $row) {
+        $periodStart = max($inicioSql, substr((string)$row['fecha_inicio'], 0, 10));
+        $periodEnd = min($finSql, substr((string)$row['fecha_fin'], 0, 10));
+        if ($periodStart > $periodEnd) continue;
+        $periods[] = [
+            'U_PeriodoNum' => (string)($index + 1),
+            'U_Semana' => (string)$row['semana'],
+            'U_Mes' => (string)((int)$row['mes']),
+            'U_FechaInicio' => $periodStart,
+            'U_FechaFin' => $periodEnd,
+        ];
+    }
+
+    return $periods;
+}
+
+function prog_periods_from_frequency(string $tipoPeriodo, int $anioBase, string $fechaInicioPlan, string $fechaFinPlan = ''): array {
+    $periods = [];
+    $start = new DateTime($fechaInicioPlan);
+    $yearStart = new DateTime(sprintf('%04d-01-01', $anioBase));
+    $cursor = $start < $yearStart ? clone $yearStart : clone $start;
+    $endLimit = $fechaFinPlan !== '' ? new DateTime($fechaFinPlan) : new DateTime(sprintf('%04d-12-31', $anioBase));
+    $yearEnd = new DateTime(sprintf('%04d-12-31', $anioBase));
+    if ($endLimit > $yearEnd) {
+        $endLimit = $yearEnd;
+    }
+
+    $periodNum = 1;
+    $tipo = strtoupper($tipoPeriodo);
+    if ($tipo === 'SEMANAL') {
+        return prog_weekly_periods_from_calendar($anioBase, $fechaInicioPlan, $fechaFinPlan);
+    }
+    while ($cursor <= $endLimit) {
+        $ini = clone $cursor;
+        $fin = clone $cursor;
+        $semana = null;
+        $mes = (int)$ini->format('n');
+
+        switch ($tipo) {
+            case 'QUINCENAL':
+                $fin->modify('+14 days');
+                break;
+            case 'MENSUAL':
+                $fin->modify('+1 month')->modify('-1 day');
+                break;
+            case 'BIMENSUAL':
+                $fin->modify('+2 months')->modify('-1 day');
+                break;
+            case 'TRIMESTRAL':
+                $fin->modify('+3 months')->modify('-1 day');
+                break;
+            case 'SEMESTRAL':
+                $fin->modify('+6 months')->modify('-1 day');
+                break;
+            case 'ANUAL':
+                $fin->modify('+1 year')->modify('-1 day');
+                break;
+            case 'BIENAL':
+                $fin->modify('+2 years')->modify('-1 day');
+                break;
+            default:
+                $fin->modify('+1 month')->modify('-1 day');
+                break;
+        }
+
+        if ($fin > $endLimit) {
+            $fin = clone $endLimit;
+        }
+
+        $periods[] = [
+            'U_PeriodoNum' => (string)$periodNum,
+            'U_Semana' => $semana !== null ? (string)$semana : null,
+            'U_Mes' => (string)$mes,
+            'U_FechaInicio' => $ini->format('Y-m-d'),
+            'U_FechaFin' => $fin->format('Y-m-d'),
+        ];
+
+        $periodNum++;
+        $cursor = clone $fin;
+        $cursor->modify('+1 day');
+    }
+
+    prog_log('periodos_calculados', [
+        'tipo_periodo' => $tipoPeriodo,
+        'anio_base' => $anioBase,
+        'fecha_inicio_plan' => $fechaInicioPlan,
+        'fecha_fin_plan' => $fechaFinPlan,
+        'total' => count($periods),
+        'primer_periodo' => $periods[0] ?? null,
+        'ultimo_periodo' => $periods ? $periods[count($periods) - 1] : null,
+    ]);
+
+    return $periods;
+}
+
+function prog_generate_occurrences(PDO $pdo, array $plan, string $nowDate, int $nowTime): array {
+    $planCode = prog_v($plan['Code'] ?? '');
+    $tipoPeriodo = prog_periodo_tipo(prog_v($plan['U_TipoPeriodo'] ?? $plan['U_Frecuencia'] ?? ''));
+    $anioBase = (int)prog_v($plan['U_AnioBase'] ?? '');
+    if ($anioBase <= 0) {
+        $anioBase = (int)substr(prog_v($plan['U_FechaInicioPlan'] ?? $plan['U_FechaProg'] ?? $nowDate), 0, 4);
+    }
+    $fechaInicioPlan = substr(prog_v($plan['U_FechaInicioPlan'] ?? $plan['U_FechaProg'] ?? ''), 0, 10);
+    $fechaProg = substr(prog_v($plan['U_FechaProg'] ?? ''), 0, 10);
+    $fechaPrimeraOcurrencia = $fechaProg !== '' ? $fechaProg : $fechaInicioPlan;
+    $fechaFinPlan = substr(prog_v($plan['U_FechaFinPlan'] ?? ''), 0, 10);
+    prog_log('generate_occurrences_inicio', [
+        'plan_code' => $planCode,
+        'tipo_periodo' => $tipoPeriodo,
+        'anio_base' => $anioBase,
+        'fecha_inicio_plan' => $fechaInicioPlan,
+        'fecha_primera_ocurrencia' => $fechaPrimeraOcurrencia,
+        'fecha_fin_plan' => $fechaFinPlan,
+        'genera_auto' => $plan['U_GeneraAuto'] ?? null,
+    ]);
+    if ($planCode === '' || $tipoPeriodo === '' || $anioBase <= 0 || $fechaInicioPlan === '') {
+        prog_log('generate_occurrences_abortado', [
+            'plan_code' => $planCode,
+            'tipo_periodo' => $tipoPeriodo,
+            'anio_base' => $anioBase,
+            'fecha_inicio_plan' => $fechaInicioPlan,
+        ]);
+        return ['generated' => 0];
+    }
+
+    prog_log('generacion_periodos', [
+        'plan_code' => $planCode,
+        'tipo_periodo' => $tipoPeriodo,
+        'anio_base' => $anioBase,
+    ]);
+    $periodos = prog_periods_from_frequency($tipoPeriodo, $anioBase, $fechaPrimeraOcurrencia, $fechaFinPlan);
+    if (!$periodos) {
+        prog_log('sin_periodos_para_generar', ['plan_code' => $planCode]);
+        return ['generated' => 0];
+    }
+
+    $insertStmt = $pdo->prepare(
+        'INSERT INTO "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+        . ' ("Code","Name","DocEntry","Canceled","Object","LogInst","UserSign","Transfered",'
+        . ' "CreateDate","CreateTime","UpdateDate","UpdateTime","DataSource",'
+        . ' "U_ProgMant","U_ItemCode","U_TipoMant","U_Anio","U_TipoPeriodo","U_PeriodoNum","U_Semana","U_Mes","U_FechaInicio","U_FechaFin","U_FechaProg","U_Estado","U_OTDocEntry","U_OTDocNum","U_FechaEjec","U_HoraIni","U_HoraFin","U_FueraFecha","U_Observacion")'
+        . ' VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    );
+
+    $generated = 0;
+    $lastPeriod = 0;
+    foreach ($periodos as $periodo) {
+        $periodoNum = (int)prog_v($periodo['U_PeriodoNum'] ?? '0');
+        $periodoIni = substr(prog_v($periodo['U_FechaInicio'] ?? ''), 0, 10);
+        $periodoFin = substr(prog_v($periodo['U_FechaFin'] ?? ''), 0, 10);
+        if ($periodoNum <= 0 || $periodoIni === '' || $periodoFin === '') {
+            continue;
+        }
+        if ($periodoFin < $fechaInicioPlan) {
+            continue;
+        }
+        if ($fechaFinPlan !== '' && $periodoIni > $fechaFinPlan) {
+            continue;
+        }
+
+        $checkStmt = $pdo->prepare(
+            'SELECT COUNT(*) AS "CNT" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+            . ' WHERE "U_ProgMant" = ? AND "U_Anio" = ? AND UPPER(COALESCE("U_TipoPeriodo", \'\')) = ? AND "U_PeriodoNum" = ?'
+        );
+        $checkStmt->execute([$planCode, (string)$anioBase, $tipoPeriodo, (string)$periodoNum]);
+        $exists = $checkStmt->fetch();
+        $checkStmt->closeCursor();
+        if (((int)($exists['CNT'] ?? array_values($exists)[0] ?? 0)) > 0) {
+            prog_log('periodo_omitido_ya_existe', [
+                'plan_code' => $planCode,
+                'periodo_num' => $periodoNum,
+            ]);
+            $lastPeriod = max($lastPeriod, $periodoNum);
+            continue;
+        }
+
+        $occCode = prog_next_occurrence_code($pdo);
+        $occEntry = prog_next_docentry($pdo, '"@TAMA_PROGDET"');
+        $name = substr($planCode . '-' . $anioBase . '-' . str_pad((string)$periodoNum, 3, '0', STR_PAD_LEFT), 0, 100);
+        $insertData = [
+            $occCode,
+            $name,
+            $occEntry,
+            'N',
+            'TAMA_PROGDET',
+            1,
+            1,
+            'N',
+            $nowDate,
+            $nowTime,
+            $nowDate,
+            $nowTime,
+            'I',
+            $planCode,
+            prog_v($plan['U_ItemCode'] ?? ''),
+            prog_nullable(prog_v($plan['U_TipoMant'] ?? '')),
+            (string)$anioBase,
+            $tipoPeriodo,
+            (string)$periodoNum,
+            prog_nullable(prog_v($periodo['U_Semana'] ?? '')),
+            prog_nullable(prog_v($periodo['U_Mes'] ?? '')),
+            $periodoIni,
+            $periodoFin,
+            $periodoIni,
+            'Pendiente',
+            null,
+            null,
+            null,
+            null,
+            null,
+            'N',
+            null,
+        ];
+        prog_log('insert_progdet_intento', [
+            'plan_code' => $planCode,
+            'occ_code' => $occCode,
+            'periodo_num' => $periodoNum,
+            'fecha_prog' => $periodoIni,
+        ]);
+        $insertStmt->execute($insertData);
+        prog_log('insert_progdet_ok', [
+            'plan_code' => $planCode,
+            'occ_code' => $occCode,
+            'periodo_num' => $periodoNum,
+        ]);
+        $generated++;
+        $lastPeriod = max($lastPeriod, $periodoNum);
+    }
+
+    $upd = $pdo->prepare(
+        'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+        . ' SET "U_UltPeriodoGen" = ?, "UpdateDate" = ?, "UpdateTime" = ?'
+        . ' WHERE "Code" = ?'
+    );
+    $upd->execute([$lastPeriod > 0 ? (string)$lastPeriod : null, $nowDate, $nowTime, $planCode]);
+    prog_sync_plan_next_date($pdo, $planCode, $nowDate, $nowTime);
+    prog_log('generate_occurrences_fin', [
+        'plan_code' => $planCode,
+        'generated' => $generated,
+        'last_period' => $lastPeriod,
+    ]);
+    return ['generated' => $generated];
+}
+
+function prog_force_generate_if_empty(PDO $pdo, array $plan, string $nowDate, int $nowTime): array {
+    $planCode = prog_v($plan['Code'] ?? '');
+    if ($planCode === '') {
+        return ['generated' => 0];
+    }
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) AS "CNT" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET" WHERE "U_ProgMant" = ?'
+    );
+    $stmt->execute([$planCode]);
+    $row = $stmt->fetch() ?: [];
+    $existing = (int)($row['CNT'] ?? array_values($row)[0] ?? 0);
+    if ($existing > 0) {
+        prog_log('force_generate_omitido_ya_hay_detalle', [
+            'plan_code' => $planCode,
+            'existing' => $existing,
+        ]);
+        return ['generated' => 0];
+    }
+
+    $tipoPeriodo = prog_periodo_tipo(prog_v($plan['U_TipoPeriodo'] ?? $plan['U_Frecuencia'] ?? ''));
+    $anioBase = (int)prog_v($plan['U_AnioBase'] ?? '');
+    if ($anioBase <= 0) {
+        $anioBase = (int)substr(prog_v($plan['U_FechaInicioPlan'] ?? $plan['U_FechaProg'] ?? $nowDate), 0, 4);
+    }
+    $fechaInicioPlan = substr(prog_v($plan['U_FechaInicioPlan'] ?? $plan['U_FechaProg'] ?? ''), 0, 10);
+    $fechaProg = substr(prog_v($plan['U_FechaProg'] ?? ''), 0, 10);
+    $fechaPrimeraOcurrencia = $fechaProg !== '' ? $fechaProg : $fechaInicioPlan;
+    $fechaFinPlan = substr(prog_v($plan['U_FechaFinPlan'] ?? ''), 0, 10);
+    if ($tipoPeriodo === '' || $anioBase <= 0 || $fechaInicioPlan === '') {
+        prog_log('force_generate_abortado', [
+            'plan_code' => $planCode,
+            'tipo_periodo' => $tipoPeriodo,
+            'anio_base' => $anioBase,
+            'fecha_inicio_plan' => $fechaInicioPlan,
+        ]);
+        return ['generated' => 0];
+    }
+
+    $periodos = prog_periods_from_frequency($tipoPeriodo, $anioBase, $fechaPrimeraOcurrencia, $fechaFinPlan);
+    if (!$periodos) {
+        prog_log('force_generate_sin_periodos', ['plan_code' => $planCode]);
+        return ['generated' => 0];
+    }
+
+    $insertStmt = $pdo->prepare(
+        'INSERT INTO "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+        . ' ("Code","Name","DocEntry","Canceled","Object","LogInst","UserSign","Transfered",'
+        . ' "CreateDate","CreateTime","UpdateDate","UpdateTime","DataSource",'
+        . ' "U_ProgMant","U_ItemCode","U_TipoMant","U_Anio","U_TipoPeriodo","U_PeriodoNum","U_Semana","U_Mes","U_FechaInicio","U_FechaFin","U_FechaProg","U_Estado","U_OTDocEntry","U_OTDocNum","U_FechaEjec","U_HoraIni","U_HoraFin","U_FueraFecha","U_Observacion")'
+        . ' VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    );
+
+    $generated = 0;
+    $lastPeriod = 0;
+    foreach ($periodos as $periodo) {
+        $periodoNum = (int)prog_v($periodo['U_PeriodoNum'] ?? '0');
+        if ($periodoNum <= 0) {
+            continue;
+        }
+        $checkStmt = $pdo->prepare(
+            'SELECT COUNT(*) AS "CNT" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+            . ' WHERE "U_ProgMant" = ? AND "U_PeriodoNum" = ?'
+        );
+        $checkStmt->execute([$planCode, (string)$periodoNum]);
+        $exists = $checkStmt->fetch();
+        $checkStmt->closeCursor();
+        if (((int)($exists['CNT'] ?? array_values($exists)[0] ?? 0)) > 0) {
+            $lastPeriod = max($lastPeriod, $periodoNum);
+            continue;
+        }
+
+        $periodoIni = substr(prog_v($periodo['U_FechaInicio'] ?? ''), 0, 10);
+        $periodoFin = substr(prog_v($periodo['U_FechaFin'] ?? ''), 0, 10);
+        $occCode = prog_next_occurrence_code($pdo);
+        $occEntry = prog_next_docentry($pdo, '"@TAMA_PROGDET"');
+        $name = substr($planCode . '-' . $anioBase . '-' . str_pad((string)$periodoNum, 3, '0', STR_PAD_LEFT), 0, 100);
+
+        prog_log('force_insert_progdet_intento', [
+            'plan_code' => $planCode,
+            'occ_code' => $occCode,
+            'periodo_num' => $periodoNum,
+            'fecha_prog' => $periodoIni,
+        ]);
+        $insertStmt->execute([
+            $occCode,
+            $name,
+            $occEntry,
+            'N',
+            'TAMA_PROGDET',
+            1,
+            1,
+            'N',
+            $nowDate,
+            $nowTime,
+            $nowDate,
+            $nowTime,
+            'I',
+            $planCode,
+            prog_v($plan['U_ItemCode'] ?? ''),
+            prog_nullable(prog_v($plan['U_TipoMant'] ?? '')),
+            (string)$anioBase,
+            $tipoPeriodo,
+            (string)$periodoNum,
+            prog_nullable(prog_v($periodo['U_Semana'] ?? '')),
+            prog_nullable(prog_v($periodo['U_Mes'] ?? '')),
+            $periodoIni,
+            $periodoFin,
+            $periodoIni,
+            'Pendiente',
+            null,
+            null,
+            null,
+            null,
+            null,
+            'N',
+            null,
+        ]);
+        prog_log('force_insert_progdet_ok', [
+            'plan_code' => $planCode,
+            'occ_code' => $occCode,
+            'periodo_num' => $periodoNum,
+        ]);
+        $generated++;
+        $lastPeriod = max($lastPeriod, $periodoNum);
+    }
+
+    $upd = $pdo->prepare(
+        'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+        . ' SET "U_UltPeriodoGen" = ?, "UpdateDate" = ?, "UpdateTime" = ?'
+        . ' WHERE "Code" = ?'
+    );
+    $upd->execute([$lastPeriod > 0 ? (string)$lastPeriod : null, $nowDate, $nowTime, $planCode]);
+    prog_sync_plan_next_date($pdo, $planCode, $nowDate, $nowTime);
+    prog_log('force_generate_fin', [
+        'plan_code' => $planCode,
+        'generated' => $generated,
+        'last_period' => $lastPeriod,
+    ]);
+
+    return ['generated' => $generated];
+}
+
+function prog_reset_pending_occurrences(PDO $pdo, string $planCode): void {
+    $stmt = $pdo->prepare(
+        'DELETE FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+        . ' WHERE "U_ProgMant" = ? AND COALESCE("U_OTDocEntry", 0) = 0'
+    );
+    $stmt->execute([$planCode]);
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    prog_out(['error' => 'Metodo no permitido'], 405);
+}
+if (!$session->isUserLoggedIn(false)) {
+    prog_out(['error' => 'No autorizado'], 401);
+}
+
+try {
+    $raw = file_get_contents('php://input');
+    $input = !empty($raw) ? (json_decode($raw, true) ?? $_POST) : $_POST;
+    prog_log('request_inicio', [
+        'method' => $_SERVER['REQUEST_METHOD'] ?? '',
+        'input' => $input,
+    ]);
+    $pdo = getHanaPdo();
+    $nowDate = date('Y-m-d');
+    $nowTime = (int)date('Hi');
+
+    $action = strtolower(prog_v($input['action'] ?? $input['accion'] ?? ''));
+    if ($action === 'update_occurrence_safe') {
+        if (!tiene_permiso('mantenimientos', 'editar')) {
+            prog_out(['error' => 'No tiene permiso para editar ocurrencias.'], 403);
+        }
+
+        $occurrenceCode = strtoupper(prog_v($input['code'] ?? ''));
+        $fechaNueva = substr(prog_v($input['fecha'] ?? ''), 0, 10);
+        $observacion = prog_v($input['observacion'] ?? '');
+        $motivo = prog_v($input['motivo'] ?? '');
+        $cancelar = !empty($input['cancelar']);
+        if ($occurrenceCode === '') {
+            prog_out(['error' => 'La ocurrencia es obligatoria.'], 400);
+        }
+        if (mb_strlen($motivo) > 220) {
+            prog_out(['error' => 'El motivo admite hasta 220 caracteres.'], 400);
+        }
+        if (mb_strlen($observacion) > 254) {
+            prog_out(['error' => 'La observacion admite hasta 254 caracteres.'], 400);
+        }
+        $occurrence = prog_fetch_occurrence($pdo, $occurrenceCode);
+        if (!$occurrence) {
+            prog_out(['error' => 'La ocurrencia no existe.'], 404);
+        }
+        $estadoAnterior = prog_v($occurrence['U_Estado'] ?? 'Pendiente');
+        if (!in_array($estadoAnterior, ['Pendiente', 'Vencido'], true)) {
+            prog_out(['error' => 'Solo se pueden modificar ocurrencias pendientes o vencidas.'], 409);
+        }
+        if (!empty($occurrence['U_OTDocEntry']) || !empty($occurrence['U_OTDocNum'])) {
+            prog_out(['error' => 'La ocurrencia tiene una OT vinculada y esta bloqueada.'], 409);
+        }
+        $checkOt = $pdo->prepare(
+            'SELECT COUNT(*) AS "CNT" FROM "SBO_TAMAING_PRODUC"."@TAMA_ORDTRABAJO" WHERE "U_ProgDet" = ?'
+        );
+        $checkOt->execute([$occurrenceCode]);
+        $otRow = $checkOt->fetch() ?: [];
+        if ((int)($otRow['CNT'] ?? array_values($otRow)[0] ?? 0) > 0) {
+            prog_out(['error' => 'La ocurrencia tiene una OT vinculada y esta bloqueada.'], 409);
+        }
+
+        $fechaAnterior = substr(prog_v($occurrence['U_FechaProg'] ?? ''), 0, 10);
+        if (!$cancelar && $fechaNueva === '') {
+            $fechaNueva = $fechaAnterior;
+        }
+        if (!$cancelar && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaNueva)) {
+            prog_out(['error' => 'La ocurrencia no tiene una fecha programada valida.'], 400);
+        }
+        $fechaCambio = !$cancelar && $fechaNueva !== $fechaAnterior;
+        if ($fechaCambio) {
+            $planOccurrence = prog_fetch_plan($pdo, prog_v($occurrence['U_ProgMant'] ?? ''));
+            if ($planOccurrence) {
+                prog_assert_equipo_programable($pdo, strtoupper(prog_v($planOccurrence['U_ItemCode'] ?? '')));
+            }
+        }
+        if (($cancelar || $fechaCambio) && mb_strlen($motivo) < 4) {
+            prog_out(['error' => 'Ingrese un motivo de al menos 4 caracteres.'], 400);
+        }
+        $fechaAplicar = $fechaCambio ? $fechaNueva : $fechaAnterior;
+        $calendar = null;
+        if ($fechaCambio) {
+            $fechaSql = $db->escape($fechaNueva);
+            $calendarRows = find_by_sql(
+                "SELECT YEAR(D.fecha) AS anio, D.semana, D.Mes AS mes, MIN(W.fecha) AS fecha_inicio, MAX(W.fecha) AS fecha_fin
+                 FROM dias_del_anio D
+                 INNER JOIN dias_del_anio W ON YEAR(W.fecha) = YEAR(D.fecha) AND W.semana = D.semana
+                 WHERE D.fecha = '{$fechaSql}'
+                 GROUP BY YEAR(D.fecha), D.semana, D.Mes"
+            );
+            if (!$calendarRows) {
+                prog_out(['error' => 'La fecha no existe en dias_del_anio.'], 400);
+            }
+            $calendar = $calendarRows[0];
+        }
+
+        $pdo->beginTransaction();
+        if ($cancelar) {
+            $updateOccurrence = $pdo->prepare(
+                'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+                . ' SET "U_Estado" = \'Cancelado\', "U_Observacion" = ?, "UpdateDate" = ?, "UpdateTime" = ?'
+                . ' WHERE "Code" = ?'
+            );
+            $updateOccurrence->execute([prog_nullable($observacion), $nowDate, $nowTime, $occurrenceCode]);
+        } elseif ($fechaCambio) {
+            $updateOccurrence = $pdo->prepare(
+                'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGDET" SET'
+                . ' "U_Anio" = ?, "U_Semana" = ?, "U_Mes" = ?, "U_FechaInicio" = ?, "U_FechaFin" = ?,'
+                . ' "U_FechaProg" = ?, "U_Observacion" = ?, "U_Estado" = \'Pendiente\','
+                . ' "UpdateDate" = ?, "UpdateTime" = ? WHERE "Code" = ?'
+            );
+            $updateOccurrence->execute([
+                (string)$calendar['anio'],
+                (string)$calendar['semana'],
+                (string)(int)$calendar['mes'],
+                substr((string)$calendar['fecha_inicio'], 0, 10),
+                substr((string)$calendar['fecha_fin'], 0, 10),
+                $fechaNueva,
+                prog_nullable($observacion),
+                $nowDate,
+                $nowTime,
+                $occurrenceCode,
+            ]);
+        } else {
+            $updateOccurrence = $pdo->prepare(
+                'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+                . ' SET "U_Observacion" = ?, "UpdateDate" = ?, "UpdateTime" = ?'
+                . ' WHERE "Code" = ?'
+            );
+            $updateOccurrence->execute([
+                prog_nullable($observacion),
+                $nowDate,
+                $nowTime,
+                $occurrenceCode,
+            ]);
+        }
+
+        $user = current_user();
+        if ($cancelar || $fechaCambio) {
+            $historyCode = 'RH' . date('YmdHis') . strtoupper(bin2hex(random_bytes(4)));
+            $historyAction = $cancelar ? '[CANCELACION] ' : '[REPROGRAMACION] ';
+            $historyReason = substr($historyAction . $motivo, 0, 254);
+            $history = $pdo->prepare(
+                'INSERT INTO "SBO_TAMAING_PRODUC"."@TAMA_REPROGHIST"'
+                . ' ("Code", "Name", "U_ProgDet", "U_FechaAnt", "U_FechaNue", "U_Semana",'
+                . ' "U_Motivo", "U_UserId", "U_Usuario", "U_FecReg", "U_HoraReg")'
+                . ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $history->execute([
+                $historyCode,
+                substr(
+                    ($cancelar ? 'CANC' : 'REPR')
+                    . '-' . $occurrenceCode . '-' . substr($historyCode, -8),
+                    0,
+                    100
+                ),
+                substr($occurrenceCode, 0, 30),
+                $fechaAnterior,
+                $fechaAplicar,
+                $fechaCambio ? (int)$calendar['semana'] : (int)($occurrence['U_Semana'] ?? 0),
+                $historyReason,
+                (int)($user['id'] ?? 0),
+                substr(prog_v($user['name'] ?? $user['username'] ?? 'Sistema'), 0, 100),
+                $nowDate,
+                $nowTime,
+            ]);
+        }
+        prog_sync_plan_next_date($pdo, prog_v($occurrence['U_ProgMant'] ?? ''), $nowDate, $nowTime);
+        $pdo->commit();
+
+        prog_log($cancelar ? 'occurrence_cancelled' : 'occurrence_safe_update', [
+            'code' => $occurrenceCode,
+            'fecha_anterior' => $fechaAnterior,
+            'fecha_nueva' => $fechaAplicar,
+            'fecha_modificada' => $fechaCambio,
+            'estado_anterior' => $estadoAnterior,
+            'motivo' => $motivo,
+            'user_id' => (int)($user['id'] ?? 0),
+        ]);
+        prog_out([
+            'success' => true,
+            'code' => $occurrenceCode,
+            'action' => $cancelar ? 'cancelled_occurrence' : 'updated_occurrence_safe',
+        ]);
+    }
+
+    if ($action === 'update_metadata') {
+        if (!tiene_permiso('mantenimientos', 'editar')) {
+            prog_out(['error' => 'No tiene permiso para editar programaciones.'], 403);
+        }
+
+        $code = strtoupper(prog_v($input['code'] ?? ''));
+        $name = prog_v($input['name'] ?? '');
+        $observacion = prog_v($input['observacion'] ?? '');
+        $modalidad = strtoupper(prog_v($input['modalidad'] ?? ''));
+        $critico = prog_bool_flag($input['critico'] ?? 'N', 'N');
+        $activo = prog_bool_flag($input['activo'] ?? 'Y', 'Y');
+        if ($modalidad !== '' && !in_array($modalidad, ['MR', 'M'], true)) {
+            prog_out(['error' => 'La modalidad debe ser MR o M.'], 400);
+        }
+        if ($code === '' || $name === '') {
+            prog_out(['error' => 'El codigo y la descripcion son obligatorios.'], 400);
+        }
+        if (mb_strlen($name) > 100 || mb_strlen($observacion) > 20000) {
+            prog_out(['error' => 'La descripcion admite 100 caracteres y la observacion del plan hasta 20,000.'], 400);
+        }
+
+        $plan = prog_fetch_plan($pdo, $code);
+        if (!$plan) {
+            prog_out(['error' => 'No existe el plan de programacion.'], 404);
+        }
+        $name = prog_unique_name($pdo, $name, $code);
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare(
+            'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+            . ' SET "Name" = ?, "U_Observacion" = ?, "U_Modalidad" = ?, "U_Critico" = ?, "U_Activo" = ?,'
+            . ' "UpdateDate" = ?, "UpdateTime" = ? WHERE "Code" = ?'
+        );
+        $stmt->execute([
+            $name,
+            prog_nullable($observacion),
+            $modalidad !== '' ? $modalidad : null,
+            $critico,
+            $activo,
+            $nowDate,
+            $nowTime,
+            $code,
+        ]);
+        $pdo->commit();
+        prog_log('update_plan_metadata', [
+            'code' => $code,
+            'before' => [
+                'name' => $plan['Name'] ?? null,
+                'observacion' => $plan['U_Observacion'] ?? null,
+                'modalidad' => $plan['U_Modalidad'] ?? null,
+                'critico' => $plan['U_Critico'] ?? null,
+                'activo' => $plan['U_Activo'] ?? null,
+            ],
+            'after' => [
+                'name' => $name,
+                'observacion' => $observacion,
+                'modalidad' => $modalidad,
+                'critico' => $critico,
+                'activo' => $activo,
+            ],
+            'user_id' => (int)($_SESSION['user_id'] ?? 0),
+        ]);
+        prog_out([
+            'success' => true,
+            'code' => $code,
+            'action' => 'updated_metadata',
+            'occurrences_modified' => 0,
+        ]);
+    }
+
+    if ($action === 'delete') {
+        if (!tiene_permiso('mantenimientos', 'editar')) {
+            prog_out(['error' => 'No tiene permiso para eliminar programaciones.'], 403);
+        }
+
+        $code = strtoupper(prog_v($input['code'] ?? ''));
+        if ($code === '') {
+            prog_out(['error' => 'Falta el codigo de la programacion.'], 400);
+        }
+
+        $plan = prog_fetch_plan($pdo, $code);
+        if (!$plan) {
+            prog_out(['error' => 'No existe el plan de programacion.'], 404);
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) AS "TOTAL",'
+            . ' SUM(CASE WHEN (COALESCE(D."U_OTDocEntry", 0) <> 0 OR COALESCE(D."U_OTDocNum", 0) <> 0)'
+            . ' AND EXISTS (SELECT 1 FROM "SBO_TAMAING_PRODUC"."@TAMA_ORDTRABAJO" O'
+            . ' WHERE COALESCE(O."Canceled", \'N\') <> \'Y\''
+            . ' AND (O."DocEntry" = D."U_OTDocEntry" OR O."DocNum" = D."U_OTDocNum"))'
+            . ' THEN 1 ELSE 0 END) AS "CNT"'
+            . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET" D'
+            . ' WHERE D."U_ProgMant" = ?'
+        );
+        $stmt->execute([$code]);
+        $rowLinked = $stmt->fetch() ?: [];
+        $linked = (int)($rowLinked['CNT'] ?? array_values($rowLinked)[0] ?? 0);
+        $occurrenceTotal = (int)($rowLinked['TOTAL'] ?? 0);
+        $stmtOt = $pdo->prepare(
+            'SELECT COUNT(*) AS "CNT"'
+            . ' FROM "SBO_TAMAING_PRODUC"."@TAMA_ORDTRABAJO"'
+            . ' WHERE COALESCE("Canceled", \'N\') <> \'Y\''
+            . ' AND ("U_ProgMant" = ? OR "U_ProgDet" IN ('
+            . ' SELECT "Code" FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET" WHERE "U_ProgMant" = ?'
+            . ' ))'
+        );
+        $stmtOt->execute([$code, $code]);
+        $rowOt = $stmtOt->fetch() ?: [];
+        $linked += (int)($rowOt['CNT'] ?? array_values($rowOt)[0] ?? 0);
+        if ($linked > 0) {
+            prog_out([
+                'error' => 'No se puede eliminar: la programacion tiene ocurrencias con OT vinculada.',
+                'linked_ot' => $linked,
+            ], 409);
+        }
+
+        $pdo->beginTransaction();
+        $delDet = $pdo->prepare(
+            'DELETE FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGDET" WHERE "U_ProgMant" = ?'
+        );
+        $delDet->execute([$code]);
+        $deletedOccurrences = $occurrenceTotal;
+
+        $delPlan = $pdo->prepare(
+            'DELETE FROM "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT" WHERE "Code" = ?'
+        );
+        $delPlan->execute([$code]);
+        $deletedPlans = $delPlan->rowCount();
+        $pdo->commit();
+
+        prog_log('delete_plan_ok', [
+            'code' => $code,
+            'deleted_plan' => $deletedPlans,
+            'deleted_occurrences' => $deletedOccurrences,
+        ]);
+        prog_out([
+            'success' => true,
+            'code' => $code,
+            'action' => 'deleted',
+            'deleted_plan' => $deletedPlans,
+            'deleted_occurrences' => $deletedOccurrences,
+        ]);
+    }
+
+    $modo = prog_v($input['modo'] ?? '');
+    if ($modo === 'ocurrencia' || !empty($input['occurrence_code'])) {
+        $occurrenceCode = strtoupper(prog_v($input['occurrence_code'] ?? $input['code'] ?? ''));
+        $estado = prog_v($input['estado'] ?? '');
+        if ($occurrenceCode === '' || $estado === '') {
+            prog_out(['error' => 'Faltan datos de la ocurrencia.'], 400);
+        }
+        $occ = prog_fetch_occurrence($pdo, $occurrenceCode);
+        if (!$occ) {
+            prog_log('ocurrencia_no_existe', ['occurrence_code' => $occurrenceCode]);
+            prog_out(['error' => 'La ocurrencia no existe.'], 404);
+        }
+        if ($estado !== 'Pendiente') {
+            prog_out([
+                'error' => 'El estado no puede cambiarse manualmente. Ejecucion y cierre deben realizarse mediante una OT.',
+            ], 409);
+        }
+        if (!empty($occ['U_OTDocEntry']) || !empty($occ['U_OTDocNum'])) {
+            prog_out(['error' => 'La ocurrencia tiene una OT vinculada y esta bloqueada.'], 409);
+        }
+        $stmt = $pdo->prepare(
+            'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGDET"'
+            . ' SET "U_Estado" = ?, "UpdateDate" = ?, "UpdateTime" = ?'
+            . ' WHERE "Code" = ?'
+        );
+        $stmt->execute([$estado, $nowDate, $nowTime, $occurrenceCode]);
+        prog_log('ocurrencia_actualizada', [
+            'occurrence_code' => $occurrenceCode,
+            'estado' => $estado,
+        ]);
+        prog_sync_plan_next_date($pdo, prog_v($occ['U_ProgMant'] ?? ''), $nowDate, $nowTime);
+        prog_out(['success' => true, 'code' => $occurrenceCode, 'action' => 'updated_occurrence']);
+    }
+
+    $code = strtoupper(prog_v($input['code'] ?? ''));
+    $name = prog_v($input['name'] ?? '');
+    $itemcode = strtoupper(prog_v($input['itemcode'] ?? ''));
+    $tipomant = strtoupper(prog_v($input['tipomant'] ?? ''));
+    $modalidad = strtoupper(prog_v($input['modalidad'] ?? ''));
+    $frecuencia = prog_v($input['frecuencia'] ?? '');
+    $tipoPeriodo = prog_periodo_tipo(prog_v($input['tipo_periodo'] ?? $frecuencia));
+    $fechaProg = substr(prog_v($input['fechaprog'] ?? ''), 0, 10);
+    $fechaInicioPlan = substr(prog_v($input['fecha_inicio_plan'] ?? $fechaProg), 0, 10);
+    $fechaFinPlan = substr(prog_v($input['fecha_fin_plan'] ?? ''), 0, 10);
+    $estado = prog_v($input['estado'] ?? 'Pendiente');
+    $observ = prog_v($input['observacion'] ?? '');
+    $activo = prog_bool_flag($input['activo'] ?? 'Y', 'Y');
+    $generaAuto = prog_bool_flag($input['genera_auto'] ?? 'Y', 'Y');
+    $anioBase = (int)prog_v($input['anio_base'] ?? substr($fechaInicioPlan !== '' ? $fechaInicioPlan : $nowDate, 0, 4));
+    $ultPeriodoGen = prog_v($input['ult_periodo_gen'] ?? '');
+    $critico = prog_bool_flag($input['critico'] ?? 'N', 'N');
+    $esEdicion = !empty($input['es_edicion']);
+
+    if ($name === '' || $itemcode === '' || $tipomant === '' || $fechaInicioPlan === '' || $frecuencia === '') {
+        prog_out(['error' => 'Complete descripcion, equipo, tipo, frecuencia y fecha inicio del plan.'], 400);
+    }
+    prog_assert_equipo_programable($pdo, $itemcode);
+    if ($modalidad !== '' && !in_array($modalidad, ['MR', 'M'], true)) {
+        prog_out(['error' => 'La modalidad debe ser MR o M.'], 400);
+    }
+    if ($tipoPeriodo === '') {
+        prog_out(['error' => 'La frecuencia / tipo de periodo es obligatorio.'], 400);
+    }
+    if (mb_strlen($observ) > 20000) {
+        prog_out(['error' => 'La observacion del plan admite hasta 20,000 caracteres.'], 400);
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaProg)
+        || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaInicioPlan)
+        || ($fechaFinPlan !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaFinPlan))) {
+        prog_out(['error' => 'Las fechas del plan no tienen un formato valido.'], 400);
+    }
+    if ($fechaProg < $fechaInicioPlan) {
+        prog_out(['error' => 'La fecha programada no puede ser anterior al inicio del plan.'], 400);
+    }
+    if ($fechaFinPlan !== '' && $fechaFinPlan < $fechaInicioPlan) {
+        prog_out(['error' => 'La fecha fin no puede ser anterior al inicio del plan.'], 400);
+    }
+    if ($fechaFinPlan !== '' && $fechaProg > $fechaFinPlan) {
+        prog_out(['error' => 'La fecha programada debe estar dentro del rango del plan.'], 400);
+    }
+    if ((int)substr($fechaProg, 0, 4) !== $anioBase) {
+        prog_out(['error' => 'La fecha programada debe pertenecer al anio base seleccionado.'], 400);
+    }
+
+    if (!$esEdicion) {
+        $pdo->beginTransaction();
+        prog_log('insert_plan_inicio', [
+            'code' => $code,
+            'name' => $name,
+            'itemcode' => $itemcode,
+            'tipomant' => $tipomant,
+            'fechaprog' => $fechaProg,
+            'fecha_inicio_plan' => $fechaInicioPlan,
+            'fecha_fin_plan' => $fechaFinPlan,
+            'frecuencia' => $frecuencia,
+            'tipo_periodo' => $tipoPeriodo,
+            'anio_base' => $anioBase,
+            'genera_auto' => $generaAuto,
+        ]);
+        if ($code === '') {
+            $code = prog_next_code($pdo);
+        }
+        $name = prog_unique_name($pdo, $name, $code);
+        $docentry = prog_next_docentry($pdo, '"@TAMA_PROGMANT"');
+        $stmt = $pdo->prepare(
+            'INSERT INTO "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+            . ' ("Code","Name","DocEntry","Canceled","Object","LogInst","UserSign","Transfered",'
+            . ' "CreateDate","CreateTime","UpdateDate","UpdateTime","DataSource",'
+            . ' "U_ItemCode","U_TipoMant","U_Modalidad","U_FechaProg","U_Frecuencia","U_Estado","U_Observacion",'
+            . ' "U_FechaInicioPlan","U_FechaFinPlan","U_GeneraAuto","U_AnioBase","U_TipoPeriodo","U_UltPeriodoGen","U_Critico","U_Activo")'
+            . ' VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+        );
+        $stmt->execute([
+            $code,
+            $name,
+            $docentry,
+            'N',
+            'TAMA_PROGMANT',
+            1,
+            1,
+            'N',
+            $nowDate,
+            $nowTime,
+            $nowDate,
+            $nowTime,
+            'I',
+            $itemcode,
+            $tipomant,
+            $modalidad !== '' ? $modalidad : null,
+            $fechaProg !== '' ? $fechaProg : $fechaInicioPlan,
+            $frecuencia,
+            $estado,
+            prog_nullable($observ),
+            $fechaInicioPlan,
+            prog_nullable($fechaFinPlan),
+            $generaAuto,
+            (string)$anioBase,
+            $tipoPeriodo,
+            prog_nullable($ultPeriodoGen),
+            $critico,
+            $activo,
+        ]);
+        prog_log('insert_plan_ok', ['code' => $code, 'docentry' => $docentry]);
+        $plan = prog_build_plan_context(
+            $code,
+            $name,
+            $itemcode,
+            $tipomant,
+            $modalidad,
+            $fechaProg,
+            $frecuencia,
+            $estado,
+            $observ,
+            $fechaInicioPlan,
+            $fechaFinPlan,
+            $generaAuto,
+            $anioBase,
+            $tipoPeriodo,
+            $ultPeriodoGen,
+            $critico,
+            $activo
+        );
+        $gen = ['generated' => 0];
+        if ($plan && $generaAuto === 'Y') {
+            $gen = prog_generate_occurrences($pdo, $plan, $nowDate, $nowTime);
+            if ((int)($gen['generated'] ?? 0) === 0) {
+                $gen = prog_force_generate_if_empty($pdo, $plan, $nowDate, $nowTime);
+            }
+            if ((int)($gen['generated'] ?? 0) <= 0) {
+                prog_fail_generation($pdo, 'insert_plan_sin_detalle', [
+                    'code' => $code,
+                    'plan' => $plan,
+                ]);
+            }
+        } else {
+            prog_sync_plan_next_date($pdo, $code, $nowDate, $nowTime);
+        }
+        if ($pdo->inTransaction()) {
+            $pdo->commit();
+        }
+        prog_log('insert_plan_fin', [
+            'code' => $code,
+            'generated' => (int)($gen['generated'] ?? 0),
+        ]);
+        prog_out(['success' => true, 'code' => $code, 'action' => 'inserted', 'generated' => $gen['generated'] ?? 0]);
+    }
+
+    $pdo->beginTransaction();
+    $plan = prog_fetch_plan($pdo, $code);
+    if (!$plan) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        prog_out(['error' => 'No existe el plan de programacion.'], 404);
+    }
+    $name = prog_unique_name($pdo, $name, $code);
+    $stmt = $pdo->prepare(
+        'UPDATE "SBO_TAMAING_PRODUC"."@TAMA_PROGMANT"'
+        . ' SET "Name" = ?, "U_ItemCode" = ?, "U_TipoMant" = ?, "U_Modalidad" = ?, "U_FechaProg" = ?, "U_Frecuencia" = ?,'
+        . ' "U_Estado" = ?, "U_Observacion" = ?, "U_FechaInicioPlan" = ?, "U_FechaFinPlan" = ?,'
+        . ' "U_GeneraAuto" = ?, "U_AnioBase" = ?, "U_TipoPeriodo" = ?, "U_UltPeriodoGen" = ?, "U_Critico" = ?, "U_Activo" = ?,'
+        . ' "UpdateDate" = ?, "UpdateTime" = ?'
+        . ' WHERE "Code" = ?'
+    );
+    $stmt->execute([
+        $name,
+        $itemcode,
+        $tipomant,
+        $modalidad !== '' ? $modalidad : null,
+        $fechaProg !== '' ? $fechaProg : $fechaInicioPlan,
+        $frecuencia,
+        $estado,
+        prog_nullable($observ),
+        $fechaInicioPlan,
+        prog_nullable($fechaFinPlan),
+        $generaAuto,
+        (string)$anioBase,
+        $tipoPeriodo,
+        prog_nullable($ultPeriodoGen),
+        $critico,
+        $activo,
+        $nowDate,
+        $nowTime,
+        $code,
+    ]);
+    prog_log('update_plan_ok', ['code' => $code]);
+
+    $generated = 0;
+    if ($generaAuto === 'Y') {
+        prog_reset_pending_occurrences($pdo, $code);
+        $plan = prog_build_plan_context(
+            $code,
+            $name,
+            $itemcode,
+            $tipomant,
+            $modalidad,
+            $fechaProg,
+            $frecuencia,
+            $estado,
+            $observ,
+            $fechaInicioPlan,
+            $fechaFinPlan,
+            $generaAuto,
+            $anioBase,
+            $tipoPeriodo,
+            $ultPeriodoGen,
+            $critico,
+            $activo
+        );
+        $gen = prog_generate_occurrences($pdo, $plan ?: [], $nowDate, $nowTime);
+        $generated = (int)($gen['generated'] ?? 0);
+        if ($generated === 0 && $plan) {
+            $gen = prog_force_generate_if_empty($pdo, $plan, $nowDate, $nowTime);
+            $generated = (int)($gen['generated'] ?? 0);
+        }
+        if ($generated <= 0) {
+            prog_fail_generation($pdo, 'update_plan_sin_detalle', [
+                'code' => $code,
+                'plan' => $plan,
+            ]);
+        }
+    } else {
+        prog_sync_plan_next_date($pdo, $code, $nowDate, $nowTime);
+    }
+
+    if ($pdo->inTransaction()) {
+        $pdo->commit();
+    }
+    prog_log('update_plan_fin', ['code' => $code, 'generated' => $generated]);
+    prog_out(['success' => true, 'code' => $code, 'action' => 'updated', 'generated' => $generated]);
+} catch (Throwable $e) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    prog_log('error', ['message' => $e->getMessage(), 'line' => $e->getLine()]);
+    prog_out([
+        'error' => 'No se pudo completar la operacion en SAP. El cambio fue revertido; intente nuevamente.',
+    ], 500);
+}

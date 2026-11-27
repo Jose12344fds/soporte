@@ -1,0 +1,548 @@
+<?php
+$page_title = 'Reporte de Procesos No Cerrados';
+require_once(__DIR__ . '/../../includes/load.php');
+require_permiso('hh-meta', 'ver');
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title><?php echo $page_title; ?></title>
+    <meta charset="utf-8"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css"><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <?php echo csrf_meta_tag(); ?>
+    <link rel="stylesheet" href="boostrap/bootstrap.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+    body { 
+        margin: 0; 
+        padding: 15px; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: #f5f6fa;
+    }
+    .filtros-container {
+        background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        border-left: 5px solid #e67e22;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .filtros-row {
+        display: flex;
+        gap: 15px;
+        align-items: end;
+        flex-wrap: wrap;
+    }
+    .filtro-group {
+        display: flex;
+        flex-direction: column;
+        min-width: 150px;
+    }
+    .filtro-group label {
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #2c3e50;
+        font-size: 14px;
+    }
+    .filtro-group select, .filtro-group input {
+        padding: 10px 12px;
+        border: 2px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+    .filtro-group select:focus, .filtro-group input:focus {
+        border-color: #e67e22;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.1);
+    }
+    .btn-filtrar {
+        background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .btn-filtrar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .estadisticas {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .stat-card {
+        background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        border-left: 5px solid #e67e22;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+    }
+    .stat-number {
+        font-size: 32px;
+        font-weight: bold;
+        color: #e67e22;
+        margin-bottom: 8px;
+    }
+    .stat-label {
+        color: #7f8c8d;
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .table-container {
+        max-height: 450px;
+        overflow-y: auto;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        background: white;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .acciones-container {
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        margin: 15px 0 10px 0;
+        background: #f8f9fa;
+        padding: 12px 15px;
+        border-radius: 8px;
+    }
+    .acciones-container .seleccion-info { 
+        color: #2c3e50; 
+        font-size: 15px;
+        font-weight: 600;
+    }
+    .btn-cerrar {
+        background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+        color: #fff; 
+        border: none; 
+        padding: 10px 18px; 
+        border-radius: 6px; 
+        cursor: pointer; 
+        font-weight: bold; 
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .btn-cerrar:hover:not([disabled]) {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .btn-cerrar[disabled] { 
+        opacity: .5; 
+        cursor: not-allowed; 
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    th {
+        background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+        color: white;
+        padding: 14px 8px;
+        text-align: center;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 3px solid #e67e22;
+    }
+    td {
+        padding: 12px 8px;
+        text-align: center;
+        border-bottom: 1px solid #ecf0f1;
+        font-size: 13px;
+        color: #2c3e50;
+    }
+    tbody tr {
+        transition: all 0.2s ease;
+    }
+    tbody tr:hover {
+        background-color: #fff3e0 !important;
+        transform: scale(1.01);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    tbody tr:nth-child(even) {
+        background-color: #f8f9fa;
+    }
+    </style>
+</head>
+<body>
+
+<div style="margin: 0; background: #fff; padding: 0;">
+    <!-- Filtros -->
+    <div class="filtros-container">
+        <h4 style="margin: 0 0 10px 0; color: #e67e22;"><i class="glyphicon glyphicon-filter"></i> Filtros</h4>
+        <div class="filtros-row">
+            <div class="filtro-group">
+                <label for="filtro-proyecto">Proyecto:</label>
+                <select id="filtro-proyecto">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+            <div class="filtro-group">
+                <label for="filtro-proceso">Proceso:</label>
+                <select id="filtro-proceso">
+                    <option value="">Todos</option>
+                    <option value="Habilitado">Habilitado</option>
+                    <option value="Fabricación">Fabricación</option>
+                    <option value="Acabados">Acabados</option>
+                    <option value="Soldadura">Soldadura</option>
+                    <option value="Mecanizado">Mecanizado</option>
+                    <option value="Calderería">Calderería</option>
+                </select>
+            </div>
+            <div class="filtro-group">
+                <label for="filtro-anio">Año:</label>
+                <select id="filtro-anio">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+            <div class="filtro-group">
+                <button class="btn-filtrar" onclick="aplicarFiltros()">
+                    <i class="glyphicon glyphicon-search"></i> Filtrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="estadisticas">
+        <div class="stat-card">
+            <div class="stat-number" id="total-procesos">0</div>
+            <div class="stat-label">Procesos Pendientes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="total-proyectos">0</div>
+            <div class="stat-label">Proyectos Afectados</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="total-semanas">0</div>
+            <div class="stat-label">Semanas Pendientes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="promedio-retraso">0</div>
+            <div class="stat-label">Promedio Retraso (días)</div>
+        </div>
+    </div>
+
+    <div id="loading" style="text-align: center; padding: 20px;">
+        <h4>Cargando datos...</h4>
+        <p>Por favor espere mientras se cargan los procesos pendientes.</p>
+    </div>
+
+    <div id="contenido" style="display: none;">
+            <div class="acciones-container">
+                <div class="seleccion-info">Seleccionados: <span id="sel-count">0</span></div>
+                <button id="btn-cerrar-seleccion" class="btn-cerrar" disabled>
+                    <i class="glyphicon glyphicon-lock"></i> Cerrar semanas seleccionadas
+                </button>
+            </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                            <th><input type="checkbox" id="chk-all"></th>
+                        <th>Proyecto</th>
+                        <th>Descripción OT</th>
+                        <th>Item</th>
+                        <th>Descripción Item</th>
+                        <th>Proceso</th>
+                        <th>Año</th>
+                        <th>Semana</th>
+                        <th>% Avance</th>
+                        <th>Horas</th>
+                        <th>Fecha Cálculo</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-datos">
+                    <!-- Los datos se cargarán aquí -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+let datosCompletos = [];
+let seleccion = new Set();
+
+// Cargar datos del reporte
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Cargando reporte de procesos no cerrados...');
+    cargarDatos();
+    cargarFiltros();
+});
+
+function cargarDatos() {
+    fetch('../../api/prgsemana/consulta_procesos_no_cerrados.php', { cache: 'no-store' })
+        .then(response => {
+            console.log('Respuesta recibida:', response);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Datos recibidos:', data);
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('contenido').style.display = 'block';
+            
+            if (data.success && data.datos.length > 0) {
+                datosCompletos = data.datos.map(item => ({ ...item, id_programa: item.id_programa ?? item.IdPrograma ?? item.idprograma ?? item.ID_PROGRAMA }));
+                mostrarDatos(datosCompletos);
+                actualizarEstadisticas(data.estadisticas);
+                extraerValoresFiltros(datosCompletos);
+            } else {
+                document.getElementById('tabla-datos').innerHTML = 
+                    '<tr><td colspan="12" style="text-align: center; padding: 20px;">No se encontraron procesos pendientes</td></tr>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('loading').innerHTML = 
+                '<h4 style="color: red;">Error al cargar los datos</h4><p>' + error + '</p>';
+        });
+}
+
+function cargarFiltros() {
+    // Cargar años disponibles (últimos 3 años)
+    const añoActual = new Date().getFullYear();
+    const selectAño = document.getElementById('filtro-anio');
+    
+    for (let i = 0; i < 3; i++) {
+        const año = añoActual - i;
+        const option = document.createElement('option');
+        option.value = año;
+        option.textContent = año;
+        selectAño.appendChild(option);
+    }
+}
+
+function extraerValoresFiltros(datos) {
+    // Extraer OTs únicas desde projectCode (otpadre)
+    const proyectosMap = new Map();
+    datos.forEach(item => {
+        const key = (item.projectCode ?? item.proyecto ?? '').toString().trim();
+        if (!key || proyectosMap.has(key)) return;
+        const desc = (item.descripcion ?? '').toString().trim();
+        const label = desc && desc !== key ? `${key} - ${desc}` : `${key}`;
+        proyectosMap.set(key, label);
+    });
+    const proyectos = Array.from(proyectosMap.keys()).sort();
+    const selectProyecto = document.getElementById('filtro-proyecto');
+    
+    // Limpiar opciones existentes (excepto "Todos")
+    selectProyecto.innerHTML = '<option value="">Todos</option>';
+    
+    proyectos.forEach(proyecto => {
+        const option = document.createElement('option');
+        option.value = proyecto;
+        option.textContent = proyectosMap.get(proyecto) || `${proyecto}`;
+        selectProyecto.appendChild(option);
+    });
+}
+
+function aplicarFiltros() {
+    const filtroProyecto = document.getElementById('filtro-proyecto').value;
+    const filtroProceso = document.getElementById('filtro-proceso').value;
+    const filtroAño = document.getElementById('filtro-anio').value;
+
+    let datosFiltrados = datosCompletos.filter(item => {
+        let cumple = true;
+        
+        const proyecto = (item.projectCode ?? item.proyecto ?? '').toString().trim();
+        if (filtroProyecto && proyecto !== filtroProyecto) cumple = false;
+        const categoria = (item.categoria_proceso || '').toString();
+        if (filtroProceso && !categoria.toLowerCase().includes(filtroProceso.toLowerCase())) cumple = false;
+        if (filtroAño && item.anio != filtroAño) cumple = false;
+        
+        return cumple;
+    });
+
+    mostrarDatos(datosFiltrados);
+    actualizarEstadisticasFiltradas(datosFiltrados);
+}
+
+function actualizarEstadisticas(stats) {
+    document.getElementById('total-procesos').textContent = stats.total_procesos || 0;
+    document.getElementById('total-proyectos').textContent = stats.total_proyectos || 0;
+    document.getElementById('total-semanas').textContent = stats.total_semanas || 0;
+    document.getElementById('promedio-retraso').textContent = (stats.promedio_dias_retraso || 0).toFixed(1);
+}
+
+function actualizarEstadisticasFiltradas(datos) {
+    const proyectosUnicos = new Set(datos.map(item => item.projectCode || item.proyecto));
+    const semanasUnicas = new Set(datos.map(item => `${item.anio}-${item.semana}`));
+    
+    document.getElementById('total-procesos').textContent = datos.length;
+    document.getElementById('total-proyectos').textContent = proyectosUnicos.size;
+    document.getElementById('total-semanas').textContent = semanasUnicas.size;
+}
+
+function mostrarDatos(datos) {
+    const tbody = document.getElementById('tabla-datos');
+    tbody.innerHTML = ''; seleccion.clear();
+
+    if (!Array.isArray(datos) || datos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 20px; color:#7f8c8d;">No hay resultados con los filtros seleccionados</td></tr>';
+        wireSeleccionEventos();
+        return;
+    }
+    
+    datos.forEach(item => {
+        const row = tbody.insertRow();
+        
+        // Formatear fecha si existe
+        let fechaCalculo = '-';
+        if (item.fecha_calculo) {
+            const fecha = new Date(item.fecha_calculo);
+            fechaCalculo = fecha.toLocaleDateString('es-ES');
+        }
+        
+        row.innerHTML = `
+            <td><input type="checkbox" class="chk-row" data-id="${item.id_programa}"></td>
+            <td><strong>${(item.projectCode || item.proyecto) ? (item.projectCode || item.proyecto) : '-'}</strong></td>
+            <td title="${item.descripcion || ''}">${truncarTexto(item.descripcion || '-', 25)}</td>
+            <td><strong>${item.item || '-'}</strong></td>
+            <td title="${item.descripcion_item || ''}">${truncarTexto(item.descripcion_item || '-', 20)}</td>
+            <td>
+                <span style="background-color: ${getColorProceso(item.categoria_proceso)}; color: white; padding: 2px 4px; border-radius: 3px; font-size: 10px;" title="${item.codigo_proceso || ''} - ${item.proceso || ''}">
+                    ${truncarTexto(item.proceso || item.codigo_proceso || '-', 20)}
+                </span>
+            </td>
+            <td>${item.anio || '-'}</td>
+            <td><strong>${item.semana || '-'}</strong></td>
+            <td>${parseFloat(item.porcentaje || 0).toFixed(1)}%</td>
+            <td>${parseFloat(item.horas || 0).toFixed(1)}</td>
+            <td>${fechaCalculo}</td>
+            <td><span style="background-color: #e74c3c; color: white; padding: 2px 4px; border-radius: 3px; font-size: 10px;">PENDIENTE</span></td>
+        `;
+    });
+
+    wireSeleccionEventos();
+}
+
+function truncarTexto(texto, limite) {
+    if (!texto || texto === '-') return '-';
+    return texto.length > limite ? texto.substring(0, limite) + '...' : texto;
+}
+
+function getColorProceso(categoria) {
+    if (!categoria) return '#6c757d';
+    switch(categoria.toLowerCase()) {
+        case 'habilitado': return '#2ecc71';
+        case 'fabricación': case 'fabricacion': return '#e67e22';
+        case 'mecanizado': return '#f39c12';
+        case 'soldadura': case 'soldeo': return '#e74c3c';
+        case 'calderería': case 'caldereria': case 'armado': return '#9b59b6';
+        case 'acabados': case 'acabado': return '#3498db';
+        default: return '#6c757d';
+    }
+}
+
+// Gestionar selección y cierre
+function wireSeleccionEventos() {
+    const selCount = document.getElementById('sel-count');
+    const btnCerrar = document.getElementById('btn-cerrar-seleccion');
+    const chkAll = document.getElementById('chk-all');
+
+    function refreshUI() {
+        selCount.textContent = seleccion.size;
+        btnCerrar.disabled = seleccion.size === 0;
+        if (chkAll) {
+            const totalRows = document.querySelectorAll('#tabla-datos .chk-row').length;
+            const selectedRows = seleccion.size;
+            chkAll.checked = totalRows > 0 && selectedRows === totalRows;
+            chkAll.indeterminate = selectedRows > 0 && selectedRows < totalRows;
+        }
+    }
+
+    // filas
+    document.querySelectorAll('#tabla-datos .chk-row').forEach(chk => {
+        chk.addEventListener('change', function() {
+            const id = Number(this.getAttribute('data-id'));
+            if (!Number.isSafeInteger(id) || id <= 0) { this.checked = false; Swal.fire({icon: "warning", title: "Actualiza el reporte", text: "No pudimos identificar esta fila. Recarga la página y vuelve a seleccionarla.", confirmButtonText: "Entendido"}); return; } if (this.checked) seleccion.add(id); else seleccion.delete(id);
+            refreshUI();
+        });
+    });
+
+    // seleccionar todo
+    if (chkAll && !chkAll._bound) {
+        chkAll.addEventListener('change', function() {
+            const check = this.checked;
+            document.querySelectorAll('#tabla-datos .chk-row').forEach(chk => {
+                chk.checked = check;
+                const id = Number(chk.getAttribute('data-id'));
+                if (!Number.isSafeInteger(id) || id <= 0) { chk.checked = false; return; } if (check) seleccion.add(id); else seleccion.delete(id);
+            });
+            refreshUI();
+        });
+        chkAll._bound = true;
+    }
+
+    // botón cerrar
+    if (btnCerrar && !btnCerrar._bound) {
+        btnCerrar.addEventListener('click', cerrarSeleccionadas);
+        btnCerrar._bound = true;
+    }
+
+    refreshUI();
+}
+
+let cerrandoSemanas = false;
+async function cerrarSeleccionadas() {
+    if (cerrandoSemanas) return;
+    const ids = Array.from(seleccion).filter(id => Number.isSafeInteger(id) && id > 0);
+    if (!ids.length) {
+        await Swal.fire({icon: 'info', title: 'Selecciona las semanas', text: 'Marca al menos una fila válida. Si el problema continúa, recarga el reporte.', confirmButtonText: 'Entendido'});
+        return;
+    }
+    cerrandoSemanas = true;
+    const btn = document.getElementById('btn-cerrar-seleccion');
+    btn.disabled = true;
+    try {
+        const confirma = await Swal.fire({icon: 'question', title: '¿Cerrar las semanas seleccionadas?', text: 'Se cerrarán ' + ids.length + ' registro(s) de programación.', showCancelButton: true, confirmButtonText: 'Sí, cerrar semanas', cancelButtonText: 'Cancelar', confirmButtonColor: '#218838', focusCancel: true});
+        if (!confirma.isConfirmed) return;
+        Swal.fire({title: 'Cerrando semanas', text: 'Espera mientras guardamos los cambios.', allowOutsideClick: false, allowEscapeKey: false, didOpen: () => Swal.showLoading()});
+        const form = new URLSearchParams();
+        form.append('_csrf', document.querySelector('meta[name="csrf-token"]').content);
+        ids.forEach(id => form.append('ids[]', String(id)));
+        const resp = await fetch('../../api/prgsemana/cerrar_semanas.php', {method: 'POST', body: form});
+        const data = await resp.json();
+        if (!resp.ok || !data.success) throw new Error(data.message || data.error || 'No pudimos guardar el cierre. Inténtalo nuevamente.');
+        const cerradas = new Set((data.ids || ids).map(Number));
+        datosCompletos = datosCompletos.filter(it => !cerradas.has(Number(it.id_programa)));
+        seleccion.clear();
+        aplicarFiltros();
+        await Swal.fire({icon: 'success', title: 'Cierre completado', text: 'Se cerraron ' + data.afectados + ' registro(s) de programación.', confirmButtonText: 'Aceptar', confirmButtonColor: '#218838'});
+    } catch (err) {
+        console.error(err);
+        const mensaje = /IDs|identificadores/i.test(err.message) ? 'No pudimos identificar las semanas seleccionadas. Recarga el reporte y vuelve a seleccionarlas.' : /Failed to fetch|NetworkError/i.test(err.message) ? 'No pudimos conectar con el servidor. Revisa tu conexión y vuelve a intentarlo.' : err.message;
+        await Swal.fire({icon: 'error', title: 'No se pudieron cerrar las semanas', text: mensaje, confirmButtonText: 'Entendido'});
+    } finally {
+        cerrandoSemanas = false;
+        btn.disabled = seleccion.size === 0;
+    }
+}
+</script>
+
+</body>
+</html>

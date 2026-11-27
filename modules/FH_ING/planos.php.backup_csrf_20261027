@@ -1,0 +1,2036 @@
+﻿<?php
+$page_title = 'Planos por Actividad — Módulo Combinado FH ING';
+require_once dirname(dirname(__DIR__)) . '/includes/load.php';
+require_permiso('ots_ingeniera', 'ver');
+require_once dirname(dirname(__DIR__)) . '/config/aps.php';
+include_once dirname(dirname(__DIR__)) . '/layouts/header.php';
+?>
+
+<link rel="stylesheet" href="../../assets/css/fh_planos.css?v=2">
+<style>
+/* ═══ COMBINED MODULE STYLES ═══════════════════════════════════════ */
+.act-header-row { background:linear-gradient(135deg,#1a3a5c 0%,#2980b9 100%); color:#fff; font-weight:600; border-bottom:3px solid #1a3a5c !important; }
+.act-header-row td { padding:9px 12px; vertical-align:middle; border:none !important; }
+.act-num { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:rgba(255,255,255,.28); color:#fff; font-size:.78rem; font-weight:700; flex-shrink:0; margin-right:6px; }
+.act-name { font-size:.92rem; letter-spacing:.01em; }
+.act-sum-dias { text-align:center !important; font-size:.88rem; white-space:nowrap; min-width:80px; }
+.act-sum-dias .dias-val { font-size:1rem; font-weight:700; }
+.act-sum-dias .horas-val { font-size:.72rem; opacity:.8; }
+.act-date { text-align:center !important; font-size:.82rem; white-space:nowrap; font-weight:500; opacity:.92; }
+.btn-add-plano { background:rgba(255,255,255,.18); border:1.5px solid rgba(255,255,255,.5); color:#fff; border-radius:6px; padding:4px 11px; font-size:.8rem; font-weight:600; cursor:pointer; white-space:nowrap; transition:background .15s; }
+.btn-add-plano:hover { background:rgba(255,255,255,.35); }
+.plano-row td { vertical-align:middle; padding:7px 10px; border-top:1px solid #f0f4f8 !important; }
+.plano-row { background:#fff; }
+.plano-row:hover { background:#f8faff; }
+.plano-row .row-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; color:#fff; font-size:.74rem; font-weight:700; }
+.empty-planos-row td { text-align:center; padding:12px 0; color:#aaa; font-style:italic; font-size:.82rem; background:#fafbfc; border-top:1px solid #f0f4f8 !important; }
+#combTable { width:100%; border-collapse:collapse; font-size:.875rem; }
+#combTable thead th { background:#f0f4f8; color:#1a3a5c; font-weight:700; padding:9px 12px; border-bottom:2px solid #dee2e6; white-space:nowrap; font-size:.82rem; text-transform:uppercase; letter-spacing:.04em; }
+.plano-row .inp-cod, .plano-row .inp-desc { width:100%; border:1.5px solid #e2e8f0; border-radius:5px; padding:5px 8px; font-size:.84rem; color:#374151; background:#fff; transition:border-color .15s; box-sizing:border-box; }
+.plano-row .inp-cod:focus, .plano-row .inp-desc:focus { outline:none; border-color:#2980b9; box-shadow:0 0 0 2px rgba(41,128,185,.12); }
+.plano-row .inp-dias { width:72px; border:1.5px solid #e2e8f0; border-radius:5px; padding:5px 6px; font-size:.88rem; font-weight:600; text-align:center; color:#374151; background:#fff; transition:border-color .15s; }
+.plano-row .inp-dias:focus { outline:none; border-color:#2980b9; }
+.dwg-upload-wrap { display:flex; flex-direction:column; gap:4px; min-width:130px; }
+.dwg-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.dwg-label { display:inline-flex; align-items:center; gap:5px; background:#e8f5e9; color:#1a5c38; border:1.5px solid #a5d6a7; border-radius:5px; padding:4px 10px; font-size:.77rem; cursor:pointer; font-weight:600; white-space:nowrap; transition:background .15s; }
+.dwg-label:hover { background:#c8e6c9; }
+.dwg-label input[type=file] { display:none; }
+.dwg-ver { background:#1a3a5c; color:#fff; border:none; border-radius:5px; padding:4px 9px; font-size:.75rem; cursor:pointer; font-weight:600; white-space:nowrap; transition:background .15s; }
+.dwg-ver:hover { background:#2980b9; }
+.dwg-download { color:#1a5c38; border:1.5px solid #a5d6a7; border-radius:5px; padding:3px 7px; font-size:.8rem; line-height:1.4; display:inline-flex; align-items:center; transition:background .15s; }
+.dwg-download:hover { background:#e8f5e9; text-decoration:none; color:#1a5c38; }
+.dwg-uploading { font-size:.75rem; color:#888; }
+.dwg-done { font-size:.76rem; color:#1a5c38; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.btn-del-plano { background:none; border:none; color:#dc3545; cursor:pointer; font-size:.95rem; padding:3px 6px; border-radius:4px; transition:background .15s; line-height:1; }
+.btn-del-plano:hover { background:#fff0f0; }
+.td-fecha { text-align:center; font-size:.8rem; white-space:nowrap; color:#374151; }
+.td-fecha.has-date { color:#2980b9; font-weight:600; }
+.combo-info-strip { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:8px 14px; background:#eef2f7; border-bottom:1px solid #d0dde9; font-size:.83rem; color:#4a5568; }
+.combo-info-strip strong { color:#1a3a5c; }
+/* File Viewer */
+#fileViewerOverlay { display:none; position:fixed; inset:0; z-index:9000; background:rgba(10,12,18,.88); align-items:flex-start; justify-content:center; padding:0; overflow:hidden; flex-direction:column; }
+#fileViewerOverlay.open { display:flex; }
+#fileViewerPanel { display:flex; flex-direction:column; width:100%; height:100vh; background:#1e2328; overflow:hidden; position:relative; }
+#fileViewerHeader { display:flex; align-items:center; gap:10px; background:#0e1117; color:#d8e0ea; padding:10px 16px; flex-shrink:0; border-bottom:1px solid #2e3440; min-height:46px; }
+#fileViewerTitle { flex:1; font-size:.92rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#d8e0ea; }
+#fileViewerDownload { color:#9aabbc; font-size:.82rem; text-decoration:none; display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border:1px solid #2e3440; border-radius:5px; white-space:nowrap; transition:background .15s; flex-shrink:0; }
+#fileViewerDownload:hover { background:#2e3440; color:#d8e0ea; }
+#fileViewerClose { background:none; border:none; color:#9aabbc; font-size:1.5rem; cursor:pointer; line-height:1; padding:0 4px; flex-shrink:0; }
+#fileViewerClose:hover { color:#e74c3c; }
+#fileViewerBody { flex:1; overflow:hidden; position:relative; display:flex; flex-direction:column; background:#1e2328; }
+#fileViewerLoading { display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; position:absolute; inset:0; background:#1e2328; color:#9aabbc; z-index:5; }
+.fvl-spinner { width:36px; height:36px; border:3px solid #2e3440; border-top-color:#27ae60; border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+#fileViewerIframe { display:none; border:none; flex:1; width:100%; height:100%; }
+#fileViewerDxfCanvas { display:none; flex:1; overflow:auto; background:#fff; width:100%; height:100%; }
+#fileViewerDxfCanvas canvas { display:block; width:100%!important; height:100%!important; }
+#fileViewerApsCanvas { display:none; width:100%; height:80vh; min-height:500px; position:relative; background:#1e2328; overflow:hidden; }
+#apsProgressBar { position:absolute; bottom:0; left:0; height:3px; background:#27ae60; width:0%; transition:width .4s ease; z-index:10; }
+#apsProgressMsg { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); color:#9aabbc; font-size:.8rem; z-index:11; white-space:nowrap; }
+#fileViewerFallback { display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:40px 20px; text-align:center; flex:1; }
+.fvf-icon { font-size:3.5rem; color:#3b4554; }
+.fvf-title { font-size:1rem; font-weight:700; color:#d8e0ea; }
+.fvf-msg { font-size:.85rem; color:#9aabbc; max-width:520px; line-height:1.6; }
+.fvf-links { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:8px; }
+.fvf-btn { background:#27ae60; color:#fff; border:none; border-radius:7px; padding:9px 18px; font-size:.88rem; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+.fvf-btn:hover { background:#219a52; color:#fff; text-decoration:none; }
+.fvf-btn-secondary { background:transparent; color:#9aabbc; border:1.5px solid #2e3440; border-radius:7px; padding:8px 14px; font-size:.83rem; text-decoration:none; display:inline-flex; align-items:center; gap:5px; }
+.fvf-btn-secondary:hover { background:#2e3440; color:#d8e0ea; text-decoration:none; }
+#fileViewerWrapper { display:flex; flex-direction:row; width:96vw; max-width:1300px; margin:20px auto; border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,.45); min-height:0; }
+#obsToggleBtn { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.18); color:#fff; border:1.5px solid rgba(255,255,255,.45); border-radius:6px; padding:5px 12px; font-size:.82rem; font-weight:600; white-space:nowrap; cursor:pointer; flex-shrink:0; transition:background .2s; }
+#obsToggleBtn:hover, #obsToggleBtn.active { background:rgba(255,255,255,.32); }
+#obsPanel { display:none; flex-direction:column; width:320px; flex-shrink:0; background:#fff; border-left:1px solid #dee2e6; }
+#obsPanelHeader { display:flex; align-items:center; justify-content:space-between; background:#1a3a5c; color:#fff; padding:10px 14px; flex-shrink:0; font-size:.88rem; font-weight:600; }
+#obsPanelHeader button { background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer; line-height:1; padding:0 4px; opacity:.8; }
+#obsPanelHeader button:hover { opacity:1; }
+#obsListWrap { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px; font-size:.83rem; }
+.obs-item { background:#f8f9fa; border:1px solid #e9ecef; border-radius:6px; padding:7px 10px; }
+.obs-item-meta { font-size:.75rem; color:#888; margin-bottom:3px; display:flex; justify-content:space-between; }
+.obs-item-text { color:#343a40; line-height:1.45; white-space:pre-wrap; word-break:break-word; }
+#obsEmpty { text-align:center; color:#aaa; padding:20px 10px; font-size:.82rem; }
+#obsForm { padding:10px 12px; border-top:1px solid #dee2e6; display:flex; flex-direction:column; gap:7px; flex-shrink:0; }
+#obsTexto { width:100%; resize:vertical; min-height:70px; border:1.5px solid #ced4da; border-radius:5px; padding:7px 10px; font-size:.83rem; color:#343a40; font-family:inherit; box-sizing:border-box; }
+#obsTexto:focus { outline:none; border-color:#1a3a5c; }
+#obsGuardar { width:100%; background:#1a3a5c; color:#fff; border:none; border-radius:6px; padding:8px 12px; font-size:.84rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+#obsGuardar:hover { background:#2980b9; }
+#obsGuardar:disabled { opacity:.6; cursor:default; }
+#obsMsg { font-size:.78rem; text-align:center; min-height:16px; }
+/* ═══ ANTECEDENTES ROW & MODAL ══════════════════════════════════ */
+.ant-act-row td { padding:10px 16px; background:#fff9f0; border-top:1px solid #fde68a !important; }
+.btn-ant-open { display:inline-flex; align-items:center; gap:7px; background:linear-gradient(135deg,#d97706,#f59e0b); color:#fff; border:none; border-radius:7px; padding:6px 16px; font-size:.82rem; font-weight:600; cursor:pointer; white-space:nowrap; transition:opacity .15s; }
+.btn-ant-open:hover { opacity:.85; }
+.ant-file-badge { display:inline-flex; align-items:center; gap:5px; background:#fff3e0; border:1.5px solid #f59e0b; color:#b45309; border-radius:20px; padding:3px 11px; font-size:.78rem; font-weight:700; }
+/* Antecedentes overlay */
+#antOverlay { display:none; position:fixed; inset:0; z-index:8500; background:rgba(10,12,18,.88); align-items:flex-start; justify-content:center; padding:20px 10px; overflow-y:auto; }
+#antOverlay.open { display:flex; }
+#antModal { background:#fff; border-radius:13px; box-shadow:0 10px 50px rgba(0,0,0,.45); width:100%; max-width:920px; overflow:hidden; margin:auto; display:flex; flex-direction:column; }
+#antHeader { background:linear-gradient(135deg,#1a3a5c 0%,#2980b9 100%); color:#fff; padding:16px 22px; display:flex; align-items:center; gap:12px; flex-shrink:0; }
+#antHeader .ant-title { flex:1; }
+#antHeader .ant-title h5 { margin:0; font-size:1.05rem; font-weight:700; }
+#antHeader .ant-title small { opacity:.82; font-size:.8rem; }
+#antCloseBtn { background:none; border:none; color:#fff; font-size:1.6rem; cursor:pointer; line-height:1; padding:0 4px; flex-shrink:0; }
+#antCloseBtn:hover { color:#ff6b6b; }
+#antBody { padding:22px 26px; display:flex; flex-direction:column; gap:16px; }
+#antAlert { font-size:.84rem; min-height:18px; }
+/* Drop zone */
+#antDropZone { border:2.5px dashed #3b82f6; border-radius:10px; padding:28px 20px; text-align:center; cursor:pointer; transition:border-color .2s,background .2s; background:#f0f6ff; position:relative; }
+#antDropZone:hover, #antDropZone.drag-over { border-color:#1a3a5c; background:#e0eaff; }
+#antDropZone .drop-icon { font-size:2.4rem; color:#3b82f6; margin-bottom:8px; }
+#antDropZone p { margin:0 0 4px; color:#374151; font-size:.92rem; }
+#antDropZone small { color:#9aabbc; font-size:.78rem; }
+#antDropZone input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2; }
+/* Upload progress */
+#antUploadProgress { display:none; }
+.ant-prog-item { display:flex; align-items:center; gap:10px; font-size:.82rem; padding:5px 0; border-bottom:1px solid #f0f0f0; }
+.ant-prog-bar-wrap { flex:1; background:#e9ecef; border-radius:4px; height:6px; overflow:hidden; }
+.ant-prog-bar { height:100%; background:#3b82f6; transition:width .3s; border-radius:4px; }
+/* File grid */
+#antGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; min-height:90px; }
+.ant-empty { grid-column:1/-1; text-align:center; padding:28px 0; color:#aaa; font-size:.88rem; display:flex; flex-direction:column; align-items:center; gap:8px; }
+.ant-empty i { font-size:2.2rem; color:#ddd; }
+.ant-file-card { background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:10px; padding:12px 10px; display:flex; flex-direction:column; align-items:center; gap:5px; position:relative; cursor:pointer; transition:border-color .15s,box-shadow .15s; }
+.ant-file-card:hover { border-color:#3b82f6; box-shadow:0 2px 12px rgba(59,130,246,.18); }
+.afc-icon { font-size:2rem; width:52px; height:52px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.afc-icon.t-cad { color:#2980b9; background:#ebf5fb; }
+.afc-icon.t-pdf { color:#e74c3c; background:#fdedec; }
+.afc-icon.t-img { color:#27ae60; background:#eafaf1; }
+.afc-icon.t-zip { color:#f59e0b; background:#fef9eb; }
+.afc-icon.t-doc { color:#2563eb; background:#eff6ff; }
+.afc-icon.t-xls { color:#166534; background:#f0fdf4; }
+.afc-icon.t-other { color:#7f8c8d; background:#f2f3f4; }
+.ant-file-card .afc-name { font-size:.76rem; font-weight:600; color:#374151; text-align:center; max-height:2.8em; overflow:hidden; line-height:1.4; word-break:break-all; }
+.ant-file-card .afc-meta { font-size:.7rem; color:#9aabbc; text-align:center; }
+.ant-file-card .afc-actions { display:flex; gap:6px; margin-top:4px; }
+.afc-btn { background:none; border:1.5px solid #dee2e6; border-radius:5px; padding:3px 8px; font-size:.71rem; cursor:pointer; display:inline-flex; align-items:center; gap:3px; transition:background .15s; text-decoration:none; }
+.afc-btn.dl { color:#2980b9; border-color:#bee3f8; }
+.afc-btn.dl:hover { background:#ebf5fb; }
+.afc-btn.del { color:#e74c3c; border-color:#fed7d7; }
+.afc-btn.del:hover { background:#fff5f5; }
+.afc-badge { position:absolute; top:6px; right:6px; font-size:.64rem; font-weight:700; padding:2px 6px; border-radius:4px; }
+.afc-badge.t-cad { background:#ebf5fb; color:#2980b9; }
+.afc-badge.t-pdf { background:#fdedec; color:#e74c3c; }
+.afc-badge.t-img { background:#eafaf1; color:#27ae60; }
+.afc-badge.t-zip { background:#fef9eb; color:#d97706; }
+.afc-badge.t-doc { background:#eff6ff; color:#2563eb; }
+.afc-badge.t-xls { background:#f0fdf4; color:#166534; }
+.afc-badge.t-other { background:#f2f3f4; color:#7f8c8d; }
+/* Obs image support */
+.obs-img-row { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.obs-thumb { width:58px; height:58px; object-fit:cover; border-radius:6px; cursor:pointer; border:1.5px solid #dee2e6; transition:border-color .15s,transform .15s; }
+.obs-thumb:hover { border-color:#2980b9; transform:scale(1.06); }
+#obsImgPreview { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:5px; min-height:0; }
+.obs-img-prev-item { position:relative; width:50px; height:50px; }
+.obs-img-prev-item img { width:100%; height:100%; object-fit:cover; border-radius:5px; border:1.5px solid #dee2e6; }
+.obs-img-prev-del { position:absolute; top:-5px; right:-5px; width:17px; height:17px; border-radius:50%; background:#dc3545; color:#fff; border:none; font-size:.55rem; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:2; }
+#obsImgLabel { display:inline-flex; align-items:center; gap:5px; cursor:pointer; color:#6c757d; font-size:.75rem; padding:4px 9px; border:1.5px dashed #ced4da; border-radius:5px; margin-bottom:5px; transition:border-color .15s,color .15s,background .15s; white-space:nowrap; }
+#obsImgLabel:hover { border-color:#2980b9; color:#2980b9; }
+#obsImgLabel.drag-over { border-color:#27ae60; color:#27ae60; background:#eafaf1; }
+#obsImgLabel.paste-ok { border-color:#27ae60; color:#27ae60; background:#eafaf1; animation:obsLblFlash .45s ease; }
+@keyframes obsLblFlash { 0%{transform:scale(1)} 30%{transform:scale(1.09)} 100%{transform:scale(1)} }
+#obsImgLabel .obs-ctrl-hint { font-size:.68rem; opacity:.55; font-weight:400; letter-spacing:.01em; }
+/* ═══ HISTORIAL DWG ════════════════════════════════════════════════ */
+#histOverlay { display:none; position:fixed; inset:0; z-index:9100; background:rgba(10,12,18,.82); align-items:center; justify-content:flex-end; }
+#histOverlay.open { display:flex; }
+#histPanel { background:#fff; width:420px; max-width:97vw; height:100vh; display:flex; flex-direction:column; box-shadow:-8px 0 40px rgba(0,0,0,.35); overflow:hidden; }
+#histHeader { background:linear-gradient(135deg,#1a3a5c 0%,#2980b9 100%); color:#fff; padding:16px 18px; flex-shrink:0; display:flex; gap:10px; align-items:flex-start; }
+#histHeader .ht-info { flex:1; }
+#histHeader .ht-info h5 { margin:0 0 3px; font-size:1rem; font-weight:700; }
+#histHeader .ht-info small { opacity:.82; font-size:.78rem; display:block; }
+#histCloseBtn { background:none; border:none; color:#fff; font-size:1.5rem; cursor:pointer; line-height:1; padding:0 3px; flex-shrink:0; }
+#histCloseBtn:hover { color:#ffb3b3; }
+#histBody { flex:1; overflow-y:auto; padding:20px 18px; display:flex; flex-direction:column; gap:0; }
+/* Entrada de versión */
+.hv-entry { display:flex; gap:12px; padding-bottom:18px; position:relative; }
+.hv-entry:not(:last-child)::before { content:''; position:absolute; left:15px; top:34px; bottom:0; width:2px; background:#e2e8f0; }
+.hv-dot { flex-shrink:0; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.78rem; font-weight:800; border:2.5px solid; margin-top:2px; position:relative; z-index:1; }
+.hv-dot.current { background:#1a3a5c; color:#fff; border-color:#1a3a5c; box-shadow:0 0 0 3px rgba(26,58,92,.18); }
+.hv-dot.old { background:#fff; color:#6c757d; border-color:#dee2e6; }
+.hv-card { flex:1; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:9px; padding:11px 13px; transition:border-color .15s; }
+.hv-entry.current-ver .hv-card { background:#f0f6ff; border-color:#93c5fd; }
+.hv-card-top { display:flex; align-items:center; gap:7px; margin-bottom:5px; flex-wrap:wrap; }
+.hv-badge-curr { background:#1a3a5c; color:#fff; font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:12px; white-space:nowrap; }
+.hv-badge-ver { background:#e9ecef; color:#495057; font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:12px; white-space:nowrap; }
+.hv-filename { font-size:.83rem; font-weight:600; color:#1e293b; word-break:break-all; flex:1; }
+.hv-ext { font-size:.7rem; font-weight:700; padding:2px 7px; border-radius:4px; white-space:nowrap; }
+.hv-ext.t-cad { background:#ebf5fb; color:#2980b9; }
+.hv-ext.t-pdf { background:#fdedec; color:#e74c3c; }
+.hv-ext.t-other { background:#f2f3f4; color:#7f8c8d; }
+.hv-meta { font-size:.74rem; color:#6c757d; display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:8px; }
+.hv-meta i { color:#9aabbc; font-size:.7rem; }
+.hv-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.hv-btn { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:6px; font-size:.76rem; font-weight:600; cursor:pointer; border:1.5px solid; text-decoration:none; transition:background .15s,transform .1s; white-space:nowrap; }
+.hv-btn:active { transform:scale(.96); }
+.hv-btn.view { background:#1a3a5c; color:#fff; border-color:#1a3a5c; }
+.hv-btn.view:hover { background:#2980b9; text-decoration:none; color:#fff; }
+.hv-btn.dl { background:#fff; color:#1a5c38; border-color:#a5d6a7; }
+.hv-btn.dl:hover { background:#e8f5e9; text-decoration:none; color:#1a5c38; }
+#histEmpty { text-align:center; padding:40px 20px; color:#aaa; font-size:.88rem; }
+#histEmpty i { font-size:2.5rem; color:#ddd; display:block; margin-bottom:10px; }
+#histLoading { text-align:center; padding:30px; color:#6c757d; font-size:.88rem; }
+/* Botón historial en fila */
+.btn-hist { background:none; border:1.5px solid #dee2e6; border-radius:5px; padding:3px 8px; font-size:.74rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px; color:#6c757d; transition:border-color .15s,color .15s,background .15s; white-space:nowrap; }
+.btn-hist:hover { border-color:#2980b9; color:#2980b9; background:#f0f6ff; }
+.btn-hist .hist-badge { background:#2980b9; color:#fff; border-radius:10px; padding:1px 6px; font-size:.65rem; font-weight:700; margin-left:1px; }
+</style>
+
+<div class="container-fluid" style="max-width:1400px; padding-top:10px;">
+
+  <!-- ══ SELECTOR DE OTs REGISTRADAS ══════════════════════════════ -->
+  <div id="otSelectorSection">
+    <div class="fh-hero" style="padding-bottom:20px;">
+      <h4><i class="fas fa-drafting-compass"></i> Planos e Ingeniería Básica de Cliente</h4>
+      <p>Selecciona una OT para registrar sus planos por actividad y generar el cronograma combinado</p>
+    </div>
+    <div class="fp-act-card" style="margin-top:-10px;">
+      <div class="fp-card-header">
+        <span><i class="fas fa-list"></i> Órdenes de Trabajo Registradas</span>
+        <span class="badge-count" id="badgeOTs">—</span>
+      </div>
+      <div class="fp-card-body">
+        <div style="margin-bottom:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <input type="text" id="filterOTs" class="form-control" style="max-width:320px; border-radius:7px; border:1.5px solid #dee2e6; padding:7px 12px; font-size:.9rem;" placeholder="Filtrar por OT o proyecto...">
+          <small class="text-muted"><i class="fas fa-hand-pointer"></i> Haz clic en una fila para trabajar con esa OT</small>
+        </div>
+        <div id="otListLoading" class="fp-empty">
+          <i class="fas fa-spinner fa-spin"></i><p>Cargando OTs...</p>
+        </div>
+        <div id="otListEmpty" class="fp-empty" style="display:none;">
+          <i class="fas fa-inbox"></i>
+          <p>No hay OTs registradas. Ve a <strong>OT Detalle</strong> para registrar una OT primero.</p>
+        </div>
+        <div id="otListWrapper" style="display:none;">
+          <div class="table-responsive">
+            <table class="table table-hover" id="tblOTs">
+              <thead>
+                <tr>
+                  <th style="width:130px;">Código OT</th>
+                  <th>Proyecto</th>
+                  <th>Elaborado por</th>
+                  <th>Actualizado al</th>
+                  <th style="width:140px;text-align:center;">Estado</th>
+                </tr>
+              </thead>
+              <tbody id="tblOTsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ INFO CARD ════════════════════════════════════════════════ -->
+  <div class="fp-info-card" id="infoCard" style="display:none;">
+    <button id="btnCambiarOT" style="background:none;border:none;color:#2980b9;font-size:.85rem;font-weight:600;cursor:pointer;padding:6px 10px;border-radius:6px;white-space:nowrap;" title="Volver al listado">
+      <i class="fas fa-arrow-left"></i> Cambiar OT
+    </button>
+    <span class="ot-badge" id="infoOT">—</span>
+    <div class="proy-nombre" id="infoProyecto">
+      <small>Nombre del proyecto</small>—
+    </div>
+    <div class="fp-date-group">
+      <label for="fechaInicioProy"><i class="fas fa-calendar-day"></i> Inicio del Proyecto</label>
+      <input type="date" id="fechaInicioProy">
+    </div>
+  </div>
+
+  <!-- ══ ACTIVIDADES + PLANOS (COMBINADO) ════════════════════════ -->
+  <div class="fp-act-card" id="actCard" style="display:none;">
+    <div class="fp-card-header">
+      <span><i class="fas fa-layer-group"></i> Registro de Planos por Actividad</span>
+      <span class="badge-count" id="badgeTotal">—</span>
+    </div>
+    <div class="fp-card-body" style="padding:0;">
+      <div style="padding:10px 14px 0;">
+        <div id="actAlert" class="fp-alert"></div>
+      </div>
+
+      <div id="actLoading" class="fp-empty" style="padding:30px 0;">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Cargando actividades...</p>
+      </div>
+
+      <div id="actTableWrapper" style="display:none;">
+        <div class="table-responsive">
+          <table id="combTable">
+            <thead>
+              <tr>
+                <th style="width:30px;">#</th>
+                <th style="width:12%;">Código</th>
+                <th>Descripción</th>
+                <th style="width:15%;">Plano / DWG</th>
+                <th style="width:70px;text-align:center;">Días</th>
+                <th style="width:100px;text-align:center;">F. Inicio</th>
+                <th style="width:100px;text-align:center;">F. Fin</th>
+                <th style="width:44px;"></th>
+              </tr>
+            </thead>
+            <tbody id="combTbody"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:14px; padding:0 14px 16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          <button class="btn-guardar-plan" id="btnGuardar">
+            <i class="fas fa-save"></i> Guardar Cronograma
+          </button>
+          <small class="text-muted">
+            <i class="fas fa-info-circle"></i>
+            Ingrese los planos de cada actividad con sus días de duración.
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ APROBACIÓN ══════════════════════════════════════════════ -->
+  <div id="aprobarSection" style="display:none; margin-bottom:16px;">
+    <div class="fp-act-card">
+      <div class="fp-card-body" style="padding:14px 18px;">
+        <div id="aprobarAlert" class="fp-alert"></div>
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <button class="btn btn-success btn-sm" id="btnAprobarMod3" style="font-weight:600; padding:8px 18px; border-radius:7px;">
+            <i class="fas fa-check-double"></i> Aprobar → Módulo 2
+          </button>
+          <button class="btn btn-sm" id="btnRetroceder" style="display:none; font-weight:600; padding:8px 18px; border-radius:7px; background:#fff3cd; border:1.5px solid #f59e0b; color:#92400e;">
+            <i class="fas fa-undo"></i> Retroceder
+          </button>
+          <span id="aprobadoBadge" style="display:none;" class="badge badge-primary" style="font-size:.9rem; padding:8px 14px;">
+            <i class="fas fa-check-double"></i>&nbsp; Aprobado — OT en Módulo 2
+          </span>
+          <a id="btnIrMod3" href="planos_mod3.php" style="display:none; background:linear-gradient(135deg,#1a3a5c,#2980b9); color:#fff; border-radius:8px; padding:8px 18px; font-size:.9rem; font-weight:700; text-decoration:none; align-items:center; gap:7px;">
+            <i class="fas fa-arrow-right"></i> Ir a Módulo 2
+          </a>
+          <small class="text-muted" id="aprobarHint">Aprueba el cronograma para habilitar el Módulo 2.</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ GANTT SECTION ════════════════════════════════════════════ -->
+  <div class="fp-gantt-card" id="ganttSection" style="display:none;">
+    <div class="fp-card-header">
+      <span><i class="fas fa-chart-bar"></i> Cronograma de Planos por Actividad</span>
+      <span class="badge-count" id="ganttBadge">—</span>
+    </div>
+    <div id="ganttContainer"></div>
+  </div>
+
+</div><!-- /container-fluid -->
+
+  <!-- ══ PROYECTOS FINALIZADOS ═══════════════════════════════ -->
+  <div class="container-fluid" style="max-width:1400px; padding-bottom:30px;">
+    <div class="fp-act-card" id="finalizadosSection">
+      <div class="fp-card-header" style="background:linear-gradient(135deg,#1a5c38,#27ae60); cursor:pointer;" id="finalizadosToggle">
+        <span><i class="fas fa-flag-checkered"></i> Proyectos Finalizados</span>
+        <span class="badge-count" id="finalizadosBadge">cargando…</span>
+      </div>
+      <div id="finalizadosBody" style="display:none;">
+        <div class="fp-card-body" style="padding:14px 0 0;">
+          <div id="finalizadosLoading" class="fp-empty" style="padding:24px;"><i class="fas fa-spinner fa-spin"></i><p>Cargando…</p></div>
+          <div id="finalizadosEmpty"  class="fp-empty" style="display:none;"><i class="fas fa-inbox"></i><p>No hay proyectos finalizados aún.</p></div>
+          <div id="finalizadosWrapper" style="display:none;">
+            <div class="table-responsive">
+              <table class="table table-hover" id="tblFinalizados">
+                <thead>
+                  <tr>
+                    <th style="width:130px;">Código OT</th>
+                    <th>Proyecto</th>
+                    <th>Elaborado por</th>
+                    <th>Actualizado al</th>
+                    <th style="width:140px;text-align:center;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tblFinalizadosBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL FECHA INICIO (obligatorio) ══════════════════════ -->
+  <div id="modalFechaInicio" style="display:none; position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,.55); align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,.35); padding:28px 32px; max-width:420px; width:100%;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+        <i class="fas fa-calendar-day" style="font-size:1.4rem; color:#2563eb;"></i>
+        <h5 style="margin:0; font-weight:700; color:#1a3a5c;">Fecha de Inicio del Proyecto</h5>
+      </div>
+      <p style="font-size:.88rem; color:#6b7280; margin-bottom:16px;">Define la fecha en que comienza el proyecto. Puedes modificarla después.</p>
+      <div style="margin-bottom:18px;">
+        <label style="font-size:.82rem; font-weight:600; color:#374151; display:block; margin-bottom:5px;"><i class="fas fa-calendar-alt" style="margin-right:5px; color:#2563eb;"></i>Fecha de Inicio</label>
+        <input type="date" id="modalFechaInput" style="width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:9px 12px; font-size:.95rem; color:#1a3a5c;">
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button onclick="cancelarSeleccionOT()" style="background:#f3f4f6; border:none; border-radius:7px; padding:9px 18px; font-size:.88rem; font-weight:600; color:#6b7280; cursor:pointer;"><i class="fas fa-times"></i> Cancelar</button>
+        <button onclick="confirmarFechaInicio()" style="background:#2563eb; border:none; border-radius:7px; padding:9px 22px; font-size:.88rem; font-weight:700; color:#fff; cursor:pointer;"><i class="fas fa-check"></i> Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL VISTA PREVIA ════════════════════════════════════ -->
+  <div id="modalPreview" style="display:none; position:fixed; inset:0; z-index:1050; background:rgba(0,0,0,.55); overflow-y:auto; padding:20px 10px;">
+    <div style="max-width:1100px; margin:0 auto; background:#fff; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,.35); overflow:hidden;">
+      <!-- Modal header -->
+      <div style="background:linear-gradient(135deg,#1a3a5c,#2980b9); color:#fff; padding:16px 22px; display:flex; align-items:center; gap:14px;">
+        <i class="fas fa-chart-gantt" style="font-size:1.3rem;"></i>
+        <div style="flex:1;">
+          <div style="font-size:1.05rem; font-weight:700;" id="modalOTLabel">—</div>
+          <div style="font-size:.82rem; opacity:.85;" id="modalProyLabel">—</div>
+        </div>
+        <span id="modalEstadoBadge" style="padding:4px 14px; border-radius:20px; font-size:.8rem; font-weight:700; background:rgba(255,255,255,.2);"></span>
+        <button onclick="cerrarModal()" style="background:none; border:none; color:#fff; font-size:1.4rem; cursor:pointer; line-height:1; padding:0 4px;">&times;</button>
+      </div>
+      <!-- Resumen módulos -->
+      <div id="modalResumenMods" style="display:flex; gap:10px; padding:14px 22px; background:#f8fafc; border-bottom:1px solid #dee2e6; flex-wrap:wrap;"></div>
+      <!-- Gantt combinado -->
+      <div style="padding:18px 22px;">
+        <div style="font-size:.88rem; font-weight:700; color:#1a3a5c; margin-bottom:10px;">
+          <i class="fas fa-chart-bar"></i> Cronograma Completo del Proyecto
+        </div>
+        <div id="modalGanttContainer"></div>
+      </div>
+    </div>
+  </div>
+
+
+<!-- ══ VISOR DE ARCHIVOS ═════════════════════════════════════════ -->
+<div id="fileViewerOverlay">
+  <div id="fileViewerWrapper">
+  <div id="fileViewerPanel">
+    <div id="fileViewerHeader">
+      <i class="fas fa-file-alt" style="font-size:1.1rem; flex-shrink:0;"></i>
+      <span id="fileViewerTitle">—</span>
+      <a id="fileViewerDownload" href="#" download title="Descargar archivo">
+        <i class="fas fa-download"></i> Descargar
+      </a>
+      <button id="obsToggleBtn" title="Mostrar/ocultar anotaciones"><i class="fas fa-sticky-note"></i> Anotaciones</button>
+      <button id="fileViewerClose" title="Cerrar">&times;</button>
+    </div>
+    <div id="fileViewerBody">
+      <div id="fileViewerLoading">
+        <div class="fvl-spinner"></div>
+        <span>Cargando archivo…</span>
+      </div>
+      <iframe id="fileViewerIframe" src="about:blank" allowfullscreen></iframe>
+      <div id="fileViewerDxfCanvas"></div>
+      <div id="fileViewerApsCanvas">
+        <div id="apsProgressBar"></div>
+        <div id="apsProgressMsg"></div>
+      </div>
+      <div id="fileViewerFallback">
+        <div class="fvf-icon"><i class="fas fa-drafting-compass"></i></div>
+        <div class="fvf-title" id="fvfTitle">Archivo DWG</div>
+        <div class="fvf-msg" id="fvfMsg">No se puede previsualizar en el navegador.</div>
+        <div class="fvf-links">
+          <a class="fvf-btn" href="#" id="fvfDownloadBtn"><i class="fas fa-download"></i> Descargar archivo</a>
+          <a class="fvf-btn-secondary" href="https://www.autodesk.com/products/dwg-trueview/overview" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> DWG TrueView</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="obsPanel">
+    <div id="obsPanelHeader">
+      <span><i class="fas fa-sticky-note"></i> Anotaciones</span>
+      <button id="obsCloseBtn" title="Cerrar panel">&times;</button>
+    </div>
+    <div id="obsListWrap">
+      <div id="obsLoading" style="text-align:center;color:#aaa;padding:14px;font-size:.82rem;"><i class="fas fa-spinner fa-spin"></i> Cargando…</div>
+      <div id="obsEmpty" style="display:none;">Sin anotaciones aún.</div>
+    </div>
+    <div id="obsForm">
+      <textarea id="obsTexto" placeholder="Escribe una anotación sobre este plano…"></textarea>
+      <div id="obsImgPreview"></div>
+      <label id="obsImgLabel" title="Clic para seleccionar · Arrastra aquí · Pega con Ctrl+V">
+        <i class="fas fa-camera"></i> Imagen ref. <span class="obs-ctrl-hint">Ctrl+V</span>
+        <input type="file" id="obsImgInput" accept="image/*" multiple style="display:none;">
+      </label>
+      <button id="obsGuardar"><i class="fas fa-plus"></i> Agregar nota</button>
+      <div id="obsMsg"></div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- ══ HISTORIAL DE VERSIONES DWG ══════════════════════════════════ -->
+<div id="histOverlay">
+  <div id="histPanel">
+    <div id="histHeader">
+      <div class="ht-info">
+        <h5><i class="fas fa-history" style="margin-right:7px;"></i>Historial de versiones</h5>
+        <small id="histSubtitle">—</small>
+      </div>
+      <button id="histCloseBtn" title="Cerrar panel">&times;</button>
+    </div>
+    <div id="histBody">
+      <div id="histLoading"><i class="fas fa-spinner fa-spin" style="font-size:1.5rem;margin-bottom:8px;display:block;"></i>Cargando historial…</div>
+      <div id="histEmpty" style="display:none;"><i class="fas fa-folder-open"></i>Solo hay una versión de este plano.<br>Aquí aparecerán las versiones anteriores cuando cambies el archivo CAD.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ANTECEDENTES MODAL ══════════════════════════════════════ -->
+<div id="antOverlay">
+  <div id="antModal">
+    <div id="antHeader">
+      <div class="ant-title">
+        <h5><i class="fas fa-folder-open" style="margin-right:8px;"></i>Documentos de Antecedentes</h5>
+        <small id="antHeaderSub">Actividad 1 — Antecedentes e interiorización de planos</small>
+      </div>
+      <button id="antCloseBtn" title="Cerrar">&times;</button>
+    </div>
+    <div id="antBody">
+      <div id="antAlert"></div>
+      <!-- Drop zone -->
+      <div id="antDropZone">
+        <input type="file" id="antFileInput" multiple>
+        <div class="drop-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+        <p>Arrastra archivos aquí o haz clic para seleccionar</p>
+        <small>CAD (DWG, DXF), PDF, imágenes, ZIP, documentos — máx. 25 MB por archivo</small>
+      </div>
+      <!-- Progress list -->
+      <div id="antUploadProgress"></div>
+      <!-- File count badge -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span id="antCount" class="ant-file-badge"><i class="fas fa-paperclip"></i> 0 archivos</span>
+      </div>
+      <!-- File grid -->
+      <div id="antGrid">
+        <div class="ant-empty" id="antEmpty">
+          <i class="fas fa-inbox"></i>
+          <span>No hay documentos aún.<br>Sube archivos usando la zona de arriba.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ JAVASCRIPT ════════════════════════════════════════════════ -->
+<script>
+(function () {
+    'use strict';
+
+    /* ─── APIs ──────────────────────────────────────────────────────── */
+    var API_OTS        = '../../api/fh_ing/get_ot_detalle.php?modulo=12';
+    var API_ACTIVIDADES= '../../api/fh_ing/get_actividades.php';
+    var API_GET        = '../../api/fh_ing/get_planos_combinado.php';
+    var API_GUARDAR    = '../../api/fh_ing/guardar_planos_combinado.php';
+    var API_ESTADO     = '../../api/fh_ing/cambiar_estado.php';
+    var API_UPLOAD     = '../../api/fh_ing/upload_plano_dwg.php';
+    var API_DOWN       = '../../api/fh_ing/descargar_plano_dwg.php';
+    var API_VER        = '../../api/fh_ing/ver_plano.php';
+    var API_DXF        = '../../api/fh_ing/get_dxf.php';
+    var API_APS_TOKEN  = '../../api/fh_ing/aps_token.php';
+    var API_APS_ENSURE = '../../api/fh_ing/aps_ensure.php';
+    var APS_ENABLED    = <?= (defined('APS_CLIENT_ID') && APS_CLIENT_ID !== '') ? 'true' : 'false' ?>;
+    var API_OBS_GET    = '../../api/fh_ing/get_obs_plano.php';
+    var API_OBS_SAVE   = '../../api/fh_ing/guardar_obs_plano.php';
+    var API_FINALIZADOS= '../../api/fh_ing/get_ot_detalle.php?modulo=4';
+    var API_GANTT      = '../../api/fh_ing/exportar_gantt.php';
+    var API_RESUMEN    = '../../api/fh_ing/get_proyecto_resumen.php';
+    var API_ANT_LIST    = '../../api/fh_ing/get_ant_archivos.php';
+    var API_ANT_UPLOAD  = '../../api/fh_ing/upload_ant_archivo.php';
+    var API_ANT_DEL     = '../../api/fh_ing/delete_ant_archivo.php';
+    var API_ANT_DOWN    = '../../api/fh_ing/descargar_ant_archivo.php';
+    var API_OBS_IMG     = '../../api/fh_ing/upload_obs_imagen.php';
+    var API_OBS_IMG_VER = '../../api/fh_ing/ver_obs_imagen.php';
+    var API_DWG_HIST    = '../../api/fh_ing/get_plano_dwg_history.php';
+    var API_HIST_DOWN   = '../../api/fh_ing/descargar_hist_dwg.php';
+
+    /* ─── State ──────────────────────────────────────────────────────── */
+    var todasActividades = [];
+    var todasOTs         = [];
+    var selectedOT       = '';
+    var selectedProy     = '';
+    var rowCounter       = 0;
+    var _pendingOT       = null;
+    var _pendingProy     = null;
+    var _apsViewer       = null;
+    var _apsPollTimer    = null;
+    var _obsIdPlanos     = 0;
+    var _obsCodPlano     = '';
+    var _obsPanelOpen    = false;
+    var _pendingTimer    = null;
+    var _finalizadosCargados = false;
+    var _antActId     = 0;
+    var _antActNombre = '';
+    var _obsImgFiles  = [];
+    var _histIdPlanos  = 0;
+    var _histCodPlano  = '';
+
+    var COLORS = ['#2980b9','#27ae60','#e67e22','#8e44ad','#16a085','#c0392b','#2c3e50','#d35400','#1abc9c','#e74c3c'];
+
+    /* ─── Helpers ────────────────────────────────────────────────────── */
+    function escHtml(v) {
+        if (v == null) return '';
+        return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function parseDate(s) {
+        if (!s) return null;
+        var p = String(s).split('-');
+        return new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2]));
+    }
+    function addDays(d, n) { var r = new Date(d); r.setDate(r.getDate() + n); return r; }
+    function daysBetween(a, b) { return Math.round((b - a) / 86400000); }
+    function fmtDate(d) {
+        if (!d) return '—';
+        return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+    }
+    function fmtDateStr(s) {
+        if (!s) return '—';
+        var p = String(s).substring(0,10).split('-');
+        return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
+    }
+    function fmtShort(d) {
+        if (!d) return '';
+        var m=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+        return String(d.getDate()).padStart(2,'0')+' '+m[d.getMonth()];
+    }
+    function today() {
+        var d=new Date();
+        return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    }
+    function fmtDias(v) { var n=parseFloat(v)||0; return String(n); }
+    function showAlert(id, type, msg) {
+        var el=document.getElementById(id); if(!el) return;
+        el.className='fp-alert '+type+' show';
+        var icon=type==='success'?'fa-check-circle':(type==='warning'?'fa-exclamation-triangle':'fa-exclamation-circle');
+        el.innerHTML='<i class="fas '+icon+'"></i> '+msg;
+    }
+    function hideAlert(id) {
+        var el=document.getElementById(id); if(!el) return;
+        el.className='fp-alert'; el.innerHTML='';
+    }
+
+    /* ─── Init ───────────────────────────────────────────────────────── */
+    document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('filterOTs').addEventListener('input', filtrarOTs);
+        document.getElementById('btnCambiarOT').addEventListener('click', volverAlListado);
+        document.getElementById('fechaInicioProy').addEventListener('change', recalcAll);
+        document.getElementById('btnGuardar').addEventListener('click', guardarCronograma);
+        document.getElementById('btnAprobarMod3').addEventListener('click', aprobarModulo3);
+        document.getElementById('btnRetroceder').addEventListener('click', retrocederOT);
+        document.getElementById('finalizadosToggle').addEventListener('click', toggleFinalizados);
+        document.getElementById('obsToggleBtn').addEventListener('click', function(){ _setObsPanel(!_obsPanelOpen); });
+        document.getElementById('obsCloseBtn').addEventListener('click', function(){ _setObsPanel(false); });
+        document.getElementById('obsGuardar').addEventListener('click', _guardarObs);
+        document.getElementById('fileViewerClose').addEventListener('click', cerrarVisor);
+        document.getElementById('fileViewerOverlay').addEventListener('click', function(e){ if(e.target===this) cerrarVisor(); });
+        document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ cerrarVisor(); _cerrarAnt(); _cerrarHistorial(); } });
+        /* Antecedentes modal */
+        document.getElementById('antCloseBtn').addEventListener('click', _cerrarAnt);
+        document.getElementById('antOverlay').addEventListener('click', function(e){ if(e.target===this) _cerrarAnt(); });
+        document.getElementById('antFileInput').addEventListener('change', function(){ _antFilesSelected(this.files); this.value=''; });
+        document.getElementById('obsImgInput').addEventListener('change', _obsImgSelected);
+        /* Drag & drop en el label de imagen de anotaciones */
+        var obsImgLbl = document.getElementById('obsImgLabel');
+        obsImgLbl.addEventListener('dragover',  function(e){ e.preventDefault(); obsImgLbl.classList.add('drag-over'); });
+        obsImgLbl.addEventListener('dragleave', function(e){ if(!obsImgLbl.contains(e.relatedTarget)) obsImgLbl.classList.remove('drag-over'); });
+        obsImgLbl.addEventListener('drop', function(e){
+            e.preventDefault(); obsImgLbl.classList.remove('drag-over');
+            if(e.dataTransfer.files && e.dataTransfer.files.length) _obsImgSelected(e.dataTransfer.files);
+        });
+        /* Pegar imagen con Ctrl+V cuando el panel de anotaciones está abierto */
+        document.addEventListener('paste', function(e){
+            if(!_obsPanelOpen) return;
+            var items = e.clipboardData && e.clipboardData.items;
+            if(!items) return;
+            var imgFiles = [];
+            for(var i=0;i<items.length;i++){
+                if(items[i].type.match(/^image\//)){
+                    var f = items[i].getAsFile();
+                    if(f) imgFiles.push(f);
+                }
+            }
+            if(!imgFiles.length) return;
+            e.preventDefault();
+            _obsImgSelected(imgFiles);
+            /* Feedback visual en el label */
+            obsImgLbl.classList.remove('paste-ok');
+            void obsImgLbl.offsetWidth; /* reflow para reiniciar animación */
+            obsImgLbl.classList.add('paste-ok');
+            setTimeout(function(){ obsImgLbl.classList.remove('paste-ok'); }, 600);
+        });
+        var antDZ = document.getElementById('antDropZone');
+        antDZ.addEventListener('dragover',  function(e){ e.preventDefault(); antDZ.classList.add('drag-over'); });
+        antDZ.addEventListener('dragleave', function(){ antDZ.classList.remove('drag-over'); });
+        antDZ.addEventListener('drop', function(e){ e.preventDefault(); antDZ.classList.remove('drag-over'); if(e.dataTransfer.files.length) _antFilesSelected(e.dataTransfer.files); });
+        /* Historial DWG */
+        document.getElementById('histCloseBtn').addEventListener('click', _cerrarHistorial);
+        document.getElementById('histOverlay').addEventListener('click', function(e){ if(e.target===this) _cerrarHistorial(); });
+        cargarActividades();
+        cargarOTsRegistradas();
+    });
+
+    /* ─── Cargar actividades ─────────────────────────────────────────── */
+    function cargarActividades() {
+        fetch(API_ACTIVIDADES)
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                if(data.error) throw new Error(data.error);
+                todasActividades = Array.isArray(data) ? data : [];
+            })
+            .catch(function(err){ console.error('Error actividades:', err.message); });
+    }
+
+    /* ─── Cargar OTs ─────────────────────────────────────────────────── */
+    function cargarOTsRegistradas() {
+        fetch(API_OTS)
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                if(data.error) throw new Error(data.error);
+                todasOTs = Array.isArray(data) ? data : [];
+                renderOTList(todasOTs);
+            })
+            .catch(function(err){
+                document.getElementById('otListLoading').innerHTML =
+                    '<i class="fas fa-exclamation-triangle"></i><p>Error: '+escHtml(err.message)+'</p>';
+            });
+    }
+
+    function renderOTList(lista) {
+        var loading=document.getElementById('otListLoading');
+        var empty=document.getElementById('otListEmpty');
+        var wrapper=document.getElementById('otListWrapper');
+        var badge=document.getElementById('badgeOTs');
+        loading.style.display='none';
+        badge.textContent=lista.length+' OT'+(lista.length!==1?'s':'');
+        if(!lista.length){ empty.style.display=''; wrapper.style.display='none'; return; }
+        empty.style.display='none'; wrapper.style.display='';
+        var html='';
+        lista.forEach(function(r){
+            var ep=parseInt(r.estado_plano);
+            var estadoBadge;
+            if(ep<0||!parseInt(r._tiene_plano))
+                estadoBadge='<span class="badge badge-secondary"><i class="fas fa-minus"></i> Sin cronograma</span>';
+            else if(ep===0)
+                estadoBadge='<span class="badge" style="background:#f39c12;color:#fff;"><i class="fas fa-pencil-alt"></i> En progreso</span>';
+            else
+                estadoBadge='<span class="badge badge-info"><i class="fas fa-check"></i> Con planos</span>';
+            html+='<tr data-ot="'+escHtml(r.ot)+'" data-proy="'+escHtml(r.proyecto)+'" data-estado="'+ep+'" style="cursor:pointer;">'+
+                '<td><strong>'+escHtml(r.ot)+'</strong></td>'+
+                '<td>'+escHtml(r.proyecto)+'</td>'+
+                '<td>'+(r.elaborado_por?escHtml(r.elaborado_por):'<span class="text-muted">—</span>')+'</td>'+
+                '<td>'+(r.actualizado_al?fmtDateStr(r.actualizado_al):'<span class="text-muted">—</span>')+'</td>'+
+                '<td style="text-align:center;">'+estadoBadge+'</td>'+
+                '</tr>';
+        });
+        document.getElementById('tblOTsBody').innerHTML=html;
+        document.querySelectorAll('#tblOTsBody tr[data-ot]').forEach(function(tr){
+            tr.addEventListener('click', function(){
+                seleccionarOT(tr.getAttribute('data-ot'), tr.getAttribute('data-proy'), parseInt(tr.getAttribute('data-estado')||'-1'));
+            });
+        });
+    }
+
+    function filtrarOTs() {
+        var term=document.getElementById('filterOTs').value.toLowerCase().trim();
+        if(!term){ renderOTList(todasOTs); return; }
+        renderOTList(todasOTs.filter(function(r){
+            return (r.ot||'').toLowerCase().includes(term)||(r.proyecto||'').toLowerCase().includes(term);
+        }));
+    }
+
+    function volverAlListado() {
+        selectedOT=''; selectedProy=''; rowCounter=0;
+        document.getElementById('otSelectorSection').style.display='';
+        document.getElementById('infoCard').style.display='none';
+        document.getElementById('actCard').style.display='none';
+        document.getElementById('ganttSection').style.display='none';
+        document.getElementById('aprobarSection').style.display='none';
+        document.getElementById('filterOTs').value='';
+        renderOTList(todasOTs);
+    }
+
+    /* ─── Seleccionar OT ─────────────────────────────────────────────── */
+    function seleccionarOT(ot, proyecto, estadoPlano) {
+        _pendingOT=ot; _pendingProy=proyecto;
+        fetch(API_GET+'?ot='+encodeURIComponent(ot))
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                if(data.fecha_inicio && data.fecha_inicio!=='0000-00-00') _abrirOT(ot, proyecto, data.fecha_inicio);
+                else _mostrarModalFecha();
+            })
+            .catch(function(){ _mostrarModalFecha(); });
+    }
+
+    function _mostrarModalFecha() {
+        var mi=document.getElementById('modalFechaInput'); mi.value=today();
+        document.getElementById('modalFechaInicio').style.display='flex'; mi.focus();
+    }
+
+    function confirmarFechaInicio() {
+        var mi=document.getElementById('modalFechaInput'); var fecha=mi.value;
+        if(!fecha){ mi.style.border='2px solid #dc2626'; mi.focus(); return; }
+        mi.style.border='';
+        document.getElementById('modalFechaInicio').style.display='none';
+        _abrirOT(_pendingOT, _pendingProy, fecha);
+    }
+    window.confirmarFechaInicio=confirmarFechaInicio;
+
+    function cancelarSeleccionOT() {
+        document.getElementById('modalFechaInicio').style.display='none';
+        _pendingOT=null; _pendingProy=null;
+    }
+    window.cancelarSeleccionOT=cancelarSeleccionOT;
+
+    function _abrirOT(ot, proyecto, fechaInicio) {
+        selectedOT=ot; selectedProy=proyecto;
+        document.getElementById('infoOT').textContent=ot;
+        document.getElementById('infoProyecto').innerHTML='<small>Nombre del proyecto</small>'+escHtml(proyecto);
+        document.getElementById('otSelectorSection').style.display='none';
+        document.getElementById('infoCard').style.display='';
+        document.getElementById('actCard').style.display='';
+        document.getElementById('ganttSection').style.display='none';
+        document.getElementById('aprobarSection').style.display='none';
+        document.getElementById('fechaInicioProy').value=fechaInicio;
+        hideAlert('actAlert'); hideAlert('aprobarAlert');
+        cargarDatosCombinados(ot);
+    }
+
+    /* ─── Cargar datos combinados ────────────────────────────────────── */
+    function cargarDatosCombinados(ot) {
+        var loading=document.getElementById('actLoading');
+        var wrapper=document.getElementById('actTableWrapper');
+        loading.style.display=''; wrapper.style.display='none'; rowCounter=0;
+
+        fetch(API_GET+'?ot='+encodeURIComponent(ot))
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                if(data.error) throw new Error(data.error);
+                if(data.fecha_inicio) document.getElementById('fechaInicioProy').value=data.fecha_inicio;
+                loading.style.display='none'; wrapper.style.display='';
+                var acts=todasActividades.length?todasActividades:(data.actividades||[]);
+                renderCombined(acts, data);
+                var hasPlanos=(data.actividades||[]).some(function(a){ return a.planos&&a.planos.length; });
+                if(hasPlanos) renderGantt(data.actividades);
+                mostrarSeccionAprobacion(parseInt(data.estado||0));
+            })
+            .catch(function(err){
+                loading.style.display='none'; wrapper.style.display='';
+                renderCombined(todasActividades, null);
+                showAlert('actAlert','error','Error al cargar: '+escHtml(err.message));
+            });
+    }
+
+    /* ─── Renderizar tabla combinada ─────────────────────────────────── */
+    function renderCombined(actividades, savedData) {
+        var tbody=document.getElementById('combTbody');
+        tbody.innerHTML=''; rowCounter=0;
+        if(!actividades||!actividades.length){
+            document.getElementById('actLoading').innerHTML='<i class="fas fa-exclamation-circle"></i><p>No se encontraron actividades.</p>';
+            document.getElementById('actLoading').style.display='';
+            document.getElementById('actTableWrapper').style.display='none';
+            return;
+        }
+        var savedMap={};
+        if(savedData&&savedData.actividades){
+            savedData.actividades.forEach(function(a){ savedMap[a.actividad_id]=a; });
+        }
+        actividades.forEach(function(act, i){
+            var color=COLORS[i%COLORS.length];
+            var saved=savedMap[act.id||act.actividad_id];
+            var actId=String(act.id||act.actividad_id);
+            var isAnt=(i===0);
+
+            var actTr=document.createElement('tr');
+            actTr.className='act-header-row';
+            actTr.setAttribute('data-act-id', actId);
+
+            if(isAnt){
+                actTr.innerHTML=
+                    '<td><span class="act-num" style="background:'+color+'">'+(act.orden||(i+1))+'</span></td>'+
+                    '<td colspan="2" class="act-name">'+escHtml(act.nombre)+'</td>'+
+                    '<td></td><td></td><td></td><td></td>'+
+                    '<td style="text-align:right;padding-right:8px;">'+
+                      '<button class="btn-ant-open" data-act-id="'+actId+'" data-act-nombre="'+escHtml(act.nombre)+'"><i class="fas fa-folder-open"></i> Ver documentos &nbsp;<span class="ant-file-badge" id="antCountBadge_'+actId+'"><i class="fas fa-paperclip"></i> …</span></button>'+
+                    '</td>';
+                tbody.appendChild(actTr);
+                // description row
+                var descTr=document.createElement('tr');
+                descTr.className='ant-act-row';
+                descTr.setAttribute('data-act-id', actId);
+                descTr.innerHTML='<td colspan="8"><i class="fas fa-info-circle" style="color:#d97706;margin-right:7px;"></i>Esta actividad concentra todos los documentos de antecedentes (planos CAD, PDF, fotografías, etc.). No forma parte del cronograma de planos.</td>';
+                tbody.appendChild(descTr);
+                actTr.querySelector('.btn-ant-open').addEventListener('click', function(){
+                    _abrirAnt(this.getAttribute('data-act-id'), this.getAttribute('data-act-nombre'));
+                });
+                _cargarAntCount(actId);
+            } else {
+                var totalDias=saved?(parseFloat(saved.total_dias)||0):0;
+                var diasLabel=totalDias>0
+                    ? '<span class="dias-val">'+fmtDias(totalDias)+' días</span><br><span class="horas-val">('+parseFloat((totalDias*8).toFixed(2))+' h)</span>'
+                    : '<span class="dias-val" style="opacity:.5">— días</span>';
+                var fi=saved&&saved.fecha_inicio?fmtDateStr(saved.fecha_inicio):'—';
+                var ff=saved&&saved.fecha_fin?fmtDateStr(saved.fecha_fin):'—';
+                actTr.innerHTML=
+                    '<td><span class="act-num" style="background:'+color+'">'+(act.orden||(i+1))+'</span></td>'+
+                    '<td colspan="2" class="act-name">'+escHtml(act.nombre)+'</td>'+
+                    '<td></td>'+
+                    '<td class="act-sum-dias" id="sumDias_'+actId+'">'+diasLabel+'</td>'+
+                    '<td class="act-date" id="actFi_'+actId+'">'+fi+'</td>'+
+                    '<td class="act-date" id="actFf_'+actId+'">'+ff+'</td>'+
+                    '<td style="text-align:right;padding-right:8px;">'+
+                      '<button class="btn-add-plano" data-act-id="'+actId+'"><i class="fas fa-plus"></i> Plano</button>'+
+                    '</td>';
+                tbody.appendChild(actTr);
+                actTr.querySelector('.btn-add-plano').addEventListener('click', function(){
+                    addPlanoRow(this.getAttribute('data-act-id'), null);
+                });
+                var planos=saved&&saved.planos?saved.planos:[];
+                if(planos.length){ planos.forEach(function(p){ addPlanoRow(actId, p); }); }
+                else { _addEmptyRow(actId, tbody); }
+            }
+        });
+        updateBadge(); recalcAll();
+    }
+
+    function _addEmptyRow(actId, tbody) {
+        var existing=tbody.querySelectorAll('.plano-row[data-act-id="'+actId+'"]');
+        if(existing.length) return;
+        var tr=document.createElement('tr');
+        tr.className='empty-planos-row'; tr.setAttribute('data-act-id', actId); tr.id='emptyRow_'+actId;
+        tr.innerHTML='<td colspan="8">Sin planos — haz clic en <strong>+ Plano</strong> para agregar</td>';
+        var rows=tbody.querySelectorAll('tr[data-act-id="'+actId+'"]');
+        var last=rows[rows.length-1];
+        if(last) last.insertAdjacentElement('afterend', tr); else tbody.appendChild(tr);
+    }
+
+    /* ─── Agregar fila de plano ──────────────────────────────────────── */
+    function addPlanoRow(actId, data) {
+        var tbody=document.getElementById('combTbody');
+        var emp=document.getElementById('emptyRow_'+actId); if(emp) emp.remove();
+        rowCounter++;
+        var rid='row_'+rowCounter;
+        var idDB=data?(data.id_planos||''):'';
+        var cod=data?escHtml(data.cod_plano||''):'';
+        var desc=data?escHtml(data.desc_plano||''):'';
+        var arch=data?(data.arch_plano||''):'';
+        var archOr=data?(data.arch_original||''):'';
+        var dias=data?(parseFloat(data.dias)||0):0;
+        var existing=tbody.querySelectorAll('.plano-row[data-act-id="'+actId+'"]');
+        var rowNum=existing.length+1;
+        var color=COLORS[(rowNum-1)%COLORS.length];
+        var archHtml=_buildArchHtml(rid, idDB, arch, archOr, cod);
+
+        var tr=document.createElement('tr');
+        tr.className='plano-row'; tr.id=rid;
+        tr.setAttribute('data-act-id', actId);
+        tr.setAttribute('data-id-db', idDB);
+        tr.setAttribute('data-arch-plano', arch);
+        tr.setAttribute('data-arch-original', archOr);
+        tr.innerHTML=
+            '<td><span class="row-num" style="background:'+color+'">'+rowNum+'</span></td>'+
+            '<td><input class="inp-cod"  type="text"   placeholder="T033138"             value="'+cod+'"></td>'+
+            '<td><input class="inp-desc" type="text"   placeholder="ENSAMBLE - SPOOL 1"  value="'+desc+'"></td>'+
+            '<td>'+archHtml+'</td>'+
+            '<td><input class="inp-dias" type="number" min="0" step="0.25" value="'+dias+'" placeholder="0.5"></td>'+
+            '<td class="td-fecha" id="fi_'+rid+'">—</td>'+
+            '<td class="td-fecha" id="ff_'+rid+'">—</td>'+
+            '<td><button class="btn-del-plano" data-act-id="'+actId+'" data-row="'+rid+'" title="Eliminar"><i class="fas fa-times"></i></button></td>';
+
+        var rows=tbody.querySelectorAll('tr[data-act-id="'+actId+'"]');
+        var lastRow=rows[rows.length-1];
+        if(lastRow) lastRow.insertAdjacentElement('afterend', tr); else tbody.appendChild(tr);
+
+        tr.querySelector('.inp-dias').addEventListener('input', recalcAll);
+        tr.querySelector('.btn-del-plano').addEventListener('click', function(){
+            delPlanoRow(this.getAttribute('data-row'), this.getAttribute('data-act-id'));
+        });
+        var fileInp=tr.querySelector('input[type=file]');
+        if(fileInp) fileInp.addEventListener('change', function(){ subirArchivo(this, rid, tr); });
+        var btnVer=tr.querySelector('.dwg-ver[data-id]');
+        if(btnVer) btnVer.addEventListener('click', function(){
+            abrirVisor(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-cod'));
+        });
+        var btnHist=tr.querySelector('.btn-hist[data-id-planos]');
+        if(btnHist) btnHist.addEventListener('click', function(){
+            _abrirHistorial(parseInt(this.getAttribute('data-id-planos')), this.getAttribute('data-cod'));
+        });
+
+        recalcAll(); updateBadge(); return tr;
+    }
+
+    function _buildArchHtml(rid, idDB, arch, archOr, cod) {
+        if(arch){
+            var histBtn = idDB ? '<button class="btn-hist" type="button" data-id-planos="'+escHtml(idDB)+'" data-cod="'+escHtml(cod)+'" title="Ver historial de versiones"><i class="fas fa-history"></i> Hist.</button>' : '';
+            return '<div class="dwg-upload-wrap">'+
+                '<div class="dwg-actions">'+
+                '<button class="dwg-ver" type="button" data-id="'+escHtml(idDB)+'" data-name="'+escHtml(archOr||arch)+'" data-cod="'+escHtml(cod)+'" title="Ver plano"><i class="fas fa-eye"></i> Ver</button>'+
+                '<a class="dwg-download" href="'+API_DOWN+'?id='+encodeURIComponent(idDB)+'" title="Descargar"><i class="fas fa-download"></i></a>'+
+                histBtn+
+                '<span class="dwg-done" title="'+escHtml(archOr||arch)+'">'+escHtml(archOr||arch)+'</span>'+
+                '</div>'+
+                '<label class="dwg-label" title="Reemplazar"><i class="fas fa-sync-alt"></i>'+
+                '<input type="file" accept=".dwg,.dxf,.pdf,.dws,.dwt" data-row="'+rid+'"></label>'+
+                '<span class="dwg-uploading" id="uploading_'+rid+'" style="display:none;"><i class="fas fa-spinner fa-spin"></i></span>'+
+                '<span class="dwg-done" id="done_'+rid+'" style="display:none;"></span>'+
+                '</div>';
+        } else {
+            return '<div class="dwg-upload-wrap">'+
+                '<label class="dwg-label"><i class="fas fa-upload"></i> Elegir DWG'+
+                '<input type="file" accept=".dwg,.dxf,.pdf,.dws,.dwt" data-row="'+rid+'"></label>'+
+                '<span class="dwg-uploading" id="uploading_'+rid+'" style="display:none;"><i class="fas fa-spinner fa-spin"></i></span>'+
+                '<span class="dwg-done" id="done_'+rid+'" style="display:none;"></span>'+
+                '</div>';
+        }
+    }
+
+    function delPlanoRow(rid, actId) {
+        var tr=document.getElementById(rid); if(!tr) return; tr.remove();
+        _renumerarActividad(actId); recalcAll(); updateBadge();
+        var tbody=document.getElementById('combTbody');
+        if(!tbody.querySelectorAll('.plano-row[data-act-id="'+actId+'"]').length) _addEmptyRow(actId, tbody);
+    }
+
+    function _renumerarActividad(actId) {
+        var rows=document.querySelectorAll('#combTbody .plano-row[data-act-id="'+actId+'"]');
+        rows.forEach(function(tr,i){
+            var badge=tr.querySelector('.row-num');
+            if(badge){ badge.textContent=(i+1); badge.style.background=COLORS[i%COLORS.length]; }
+        });
+    }
+
+    function updateBadge() {
+        var n=document.querySelectorAll('#combTbody .plano-row').length;
+        document.getElementById('badgeTotal').textContent=n+' plano'+(n!==1?'s':'');
+    }
+
+    /* ─── Recalcular todas las fechas ────────────────────────────────── */
+    function recalcAll() {
+        var fechaVal=document.getElementById('fechaInicioProy').value;
+        var actHeaders=document.querySelectorAll('#combTbody .act-header-row');
+        if(!fechaVal){
+            document.querySelectorAll('#combTbody .plano-row').forEach(function(tr){
+                var rid=tr.id;
+                var fi=document.getElementById('fi_'+rid); if(fi){fi.textContent='—';fi.classList.remove('has-date');}
+                var ff=document.getElementById('ff_'+rid); if(ff){ff.textContent='—';ff.classList.remove('has-date');}
+            });
+            actHeaders.forEach(function(ar){
+                var aid=ar.getAttribute('data-act-id');
+                var s=document.getElementById('sumDias_'+aid); if(s) s.innerHTML='<span class="dias-val" style="opacity:.5">— días</span>';
+                var fi=document.getElementById('actFi_'+aid); if(fi) fi.textContent='—';
+                var ff=document.getElementById('actFf_'+aid); if(ff) ff.textContent='—';
+            });
+            return;
+        }
+        var current=parseDate(fechaVal);
+        actHeaders.forEach(function(actRow){
+            var actId=actRow.getAttribute('data-act-id');
+            var planoRows=document.querySelectorAll('#combTbody .plano-row[data-act-id="'+actId+'"]');
+            var actFi=null, actFf=null, totalDias=0;
+            planoRows.forEach(function(tr){
+                var rid=tr.id;
+                var dias=parseFloat(tr.querySelector('.inp-dias').value)||0;
+                var tdFi=document.getElementById('fi_'+rid);
+                var tdFf=document.getElementById('ff_'+rid);
+                if(dias>0){
+                    var ceilD=Math.ceil(dias);
+                    var fi=new Date(current); var ff=addDays(current,ceilD-1);
+                    if(tdFi){tdFi.textContent=fmtDate(fi);tdFi.classList.add('has-date');}
+                    if(tdFf){tdFf.textContent=fmtDate(ff);tdFf.classList.add('has-date');}
+                    if(!actFi) actFi=fi; actFf=ff; totalDias+=dias;
+                    current=addDays(ff,1);
+                } else {
+                    if(tdFi){tdFi.textContent='—';tdFi.classList.remove('has-date');}
+                    if(tdFf){tdFf.textContent='—';tdFf.classList.remove('has-date');}
+                }
+            });
+            var sumEl=document.getElementById('sumDias_'+actId);
+            if(sumEl){
+                if(totalDias>0) sumEl.innerHTML='<span class="dias-val">'+fmtDias(totalDias)+' días</span><br><span class="horas-val">('+parseFloat((totalDias*8).toFixed(2))+' h)</span>';
+                else sumEl.innerHTML='<span class="dias-val" style="opacity:.5">— días</span>';
+            }
+            var fiEl=document.getElementById('actFi_'+actId); if(fiEl) fiEl.textContent=actFi?fmtDate(actFi):'—';
+            var ffEl=document.getElementById('actFf_'+actId); if(ffEl) ffEl.textContent=actFf?fmtDate(actFf):'—';
+        });
+    }
+
+    /* ─── Subir archivo DWG ──────────────────────────────────────────── */
+    function subirArchivo(input, rid, tr) {
+        if(!input.files||!input.files[0]) return;
+        var uploading=document.getElementById('uploading_'+rid);
+        var done=document.getElementById('done_'+rid);
+        uploading.style.display=''; if(done) done.style.display='none';
+        var fd=new FormData(); fd.append('file', input.files[0]);
+        fetch(API_UPLOAD,{method:'POST',body:fd})
+            .then(function(r){return r.json();})
+            .then(function(res){
+                uploading.style.display='none';
+                if(res.ok){
+                    tr.setAttribute('data-arch-plano', res.saved_name);
+                    tr.setAttribute('data-arch-original', res.original_name);
+                    if(done){done.style.display='';done.innerHTML='<i class="fas fa-check-circle" style="color:#27ae60;"></i> '+escHtml(res.original_name);}
+                    showAlert('actAlert','success','Archivo subido: <b>'+escHtml(res.original_name)+'</b>');
+                } else {
+                    showAlert('actAlert','error','Error al subir: '+escHtml(res.error||'desconocido'));
+                }
+            })
+            .catch(function(err){uploading.style.display='none';showAlert('actAlert','error','Error de conexión: '+escHtml(err.message));});
+    }
+
+    /* ─── Guardar cronograma ─────────────────────────────────────────── */
+    function guardarCronograma() {
+        if(!selectedOT){ showAlert('actAlert','error','Selecciona una OT primero.'); return; }
+        var fechaInicio=document.getElementById('fechaInicioProy').value;
+        if(!fechaInicio){ showAlert('actAlert','error','Ingresa la fecha de inicio del proyecto.'); return; }
+        var upl=document.querySelectorAll('.dwg-uploading');
+        for(var u=0;u<upl.length;u++){ if(upl[u].style.display!=='none'){ showAlert('actAlert','warning','Espera a que terminen las subidas de archivo.'); return; } }
+
+        var actHeaders=document.querySelectorAll('#combTbody .act-header-row');
+        var actividades=[];
+        actHeaders.forEach(function(actRow){
+            var actId=actRow.getAttribute('data-act-id');
+            var planoRows=document.querySelectorAll('#combTbody .plano-row[data-act-id="'+actId+'"]');
+            var planos=[];
+            planoRows.forEach(function(tr){
+                planos.push({
+                    id_planos:    parseInt(tr.getAttribute('data-id-db')) || 0,
+                    cod_plano:    tr.querySelector('.inp-cod').value.trim(),
+                    desc_plano:   tr.querySelector('.inp-desc').value.trim(),
+                    arch_plano:   tr.getAttribute('data-arch-plano')||'',
+                    arch_original:tr.getAttribute('data-arch-original')||'',
+                    dias:         parseFloat(tr.querySelector('.inp-dias').value)||0,
+                });
+            });
+            actividades.push({actividad_id:actId, planos:planos});
+        });
+
+        var btn=document.getElementById('btnGuardar');
+        btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        hideAlert('actAlert');
+
+        fetch(API_GUARDAR,{
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ot:selectedOT, proyecto:selectedProy, fecha_inicio:fechaInicio, actividades:actividades}),
+        })
+        .then(function(r){return r.json();})
+        .then(function(data){
+            if(data.success){
+                showAlert('actAlert','success', data.message||'Cronograma guardado correctamente.');
+                // Actualizar data-id-db en cada fila con el id_planos retornado
+                if(data.actividades && data.actividades.length) {
+                    var actHeaders2 = document.querySelectorAll('#combTbody .act-header-row');
+                    data.actividades.forEach(function(act) {
+                        var actId = act.actividad_id;
+                        var planoRows2 = document.querySelectorAll('#combTbody .plano-row[data-act-id="'+actId+'"]');
+                        if(act.planos && act.planos.length) {
+                            act.planos.forEach(function(p, idx) {
+                                if(planoRows2[idx] && p.id_planos) {
+                                    var tr2 = planoRows2[idx];
+                                    tr2.setAttribute('data-id-db', p.id_planos);
+                                    if(p.arch_plano) {
+                                        // Siempre reconstruir la celda de archivo para que el nombre
+                                        // se actualice en pantalla sin necesidad de refrescar la página
+                                        tr2.setAttribute('data-arch-plano',   p.arch_plano);
+                                        tr2.setAttribute('data-arch-original', p.arch_original||p.arch_plano);
+                                        var cod2     = tr2.querySelector('.inp-cod') ? tr2.querySelector('.inp-cod').value : '';
+                                        var rid2     = tr2.getAttribute('id');
+                                        var archWrap = tr2.querySelector('.dwg-upload-wrap');
+                                        if(archWrap) {
+                                            archWrap.outerHTML = _buildArchHtml(rid2, p.id_planos, p.arch_plano, p.arch_original||p.arch_plano, cod2);
+                                            // Re-registrar eventos del nuevo HTML
+                                            var bv2 = tr2.querySelector('.dwg-ver[data-id]');
+                                            if(bv2) bv2.addEventListener('click', function(){ abrirVisor(this.getAttribute('data-id'),this.getAttribute('data-name'),this.getAttribute('data-cod')); });
+                                            var bh2 = tr2.querySelector('.btn-hist[data-id-planos]');
+                                            if(bh2) bh2.addEventListener('click', function(){ _abrirHistorial(parseInt(this.getAttribute('data-id-planos')),this.getAttribute('data-cod')); });
+                                            var fi2 = tr2.querySelector('input[type="file"][data-row]');
+                                            if(fi2) fi2.addEventListener('change', function(){ subirArchivo(this, rid2, tr2); });
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    });
+                    renderGantt(data.actividades);
+                }
+                document.getElementById('aprobarSection').style.display='';
+                mostrarSeccionAprobacion(0);
+                // ── Pre-calentar APS para todos los CAD guardados ──────
+                if (APS_ENABLED) {
+                    document.querySelectorAll('#combTbody .plano-row').forEach(function(tr2) {
+                        var idDb  = parseInt(tr2.getAttribute('data-id-db')) || 0;
+                        var arch  = tr2.getAttribute('data-arch-plano') || '';
+                        if (!idDb || !arch) return;
+                        var ext = arch.split('.').pop().toLowerCase();
+                        if (['dwg','dxf','dws','dwt'].indexOf(ext) === -1) return;
+                        fetch(API_APS_ENSURE + '?id=' + encodeURIComponent(idDb))
+                            .catch(function() {});
+                    });
+                }
+            } else {
+                showAlert('actAlert','error', data.error||data.message||'Error al guardar.');
+            }
+        })
+        .catch(function(err){showAlert('actAlert','error','Error: '+err.message);})
+        .finally(function(){btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> Guardar Cronograma';});
+    }
+
+    /* ─── Aprobación ─────────────────────────────────────────────────── */
+    function mostrarSeccionAprobacion(estado) {
+        var sec=document.getElementById('aprobarSection');
+        var btn=document.getElementById('btnAprobarMod3');
+        var btnRet=document.getElementById('btnRetroceder');
+        var badge=document.getElementById('aprobadoBadge');
+        var btnIr=document.getElementById('btnIrMod3');
+        var hint=document.getElementById('aprobarHint');
+        sec.style.display='';
+        if(estado>=2){
+            btn.style.display='none'; badge.style.display=''; btnIr.style.display='inline-flex'; btnRet.style.display='';
+            hint.textContent='El cronograma está aprobado. El Módulo 2 está habilitado.';
+        } else {
+            btn.style.display=''; badge.style.display='none'; btnIr.style.display='none'; btnRet.style.display='none';
+            hint.textContent='Aprueba el cronograma para habilitar el Módulo 2.';
+        }
+    }
+
+    function aprobarModulo3() {
+        if(!selectedOT) return;
+        var btn=document.getElementById('btnAprobarMod3');
+        btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Aprobando...';
+        hideAlert('aprobarAlert');
+        fetch(API_ESTADO,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ot:selectedOT,estado:2})})
+            .then(function(r){return r.json();})
+            .then(function(data){
+                if(data.success){
+                    showAlert('aprobarAlert','success','OT aprobada. Módulo 2 habilitado.');
+                    mostrarSeccionAprobacion(2);
+                    todasOTs=todasOTs.filter(function(r){return r.ot!==selectedOT;});
+                } else {
+                    showAlert('aprobarAlert','error',data.message||'Error al aprobar.');
+                    btn.disabled=false; btn.innerHTML='<i class="fas fa-check-double"></i> Aprobar → Módulo 3';
+                }
+            })
+            .catch(function(err){
+                showAlert('aprobarAlert','error','Error: '+err.message);
+                btn.disabled=false; btn.innerHTML='<i class="fas fa-check-double"></i> Aprobar → Módulo 3';
+            });
+    }
+
+    function retrocederOT() {
+        if(!selectedOT) return;
+        if(!confirm('¿Retroceder "'+selectedOT+'" al estado en progreso? Se conservan los datos guardados.')) return;
+        var btn=document.getElementById('btnRetroceder'); btn.disabled=true;
+        fetch(API_ESTADO,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ot:selectedOT,estado:0})})
+            .then(function(r){return r.json();})
+            .then(function(data){
+                if(data.success){ showAlert('aprobarAlert','success','OT retrocedida.'); mostrarSeccionAprobacion(0); cargarOTsRegistradas(); }
+                else showAlert('aprobarAlert','error',data.message||'Error.');
+            })
+            .catch(function(err){showAlert('aprobarAlert','error','Error: '+err.message);})
+            .finally(function(){btn.disabled=false;});
+    }
+
+    /* ─── Gantt ──────────────────────────────────────────────────────── */
+    function renderGantt(actividades) {
+        var section=document.getElementById('ganttSection');
+        var container=document.getElementById('ganttContainer');
+        var allPlanos=[];
+        actividades.forEach(function(act,ai){
+            (act.planos||[]).forEach(function(p){
+                if(p.fecha_inicio&&p.fecha_fin&&parseFloat(p.dias)>0){
+                    allPlanos.push({
+                        actId:act.actividad_id, actNome:act.nombre||'',
+                        actColor:COLORS[ai%COLORS.length], actIdx:ai,
+                        cod:p.cod_plano||'', desc:p.desc_plano||'',
+                        dias:parseFloat(p.dias), fi:parseDate(p.fecha_inicio), ff:parseDate(p.fecha_fin),
+                    });
+                }
+            });
+        });
+        if(!allPlanos.length){section.style.display='none'; return;}
+        var pStart=allPlanos.reduce(function(m,p){return p.fi<m?p.fi:m;},allPlanos[0].fi);
+        var pEnd=allPlanos.reduce(function(m,p){return p.ff>m?p.ff:m;},allPlanos[0].ff);
+        var totalDays=daysBetween(pStart,pEnd)+1;
+        var meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        var segments=[]; var cur=new Date(pStart.getFullYear(),pStart.getMonth(),1);
+        while(cur<=pEnd){
+            var segS=cur<pStart?new Date(pStart):new Date(cur);
+            var nextM=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+            var segE=nextM>pEnd?new Date(pEnd):new Date(nextM.getTime()-86400000);
+            segments.push({label:meses[cur.getMonth()]+' '+cur.getFullYear(),pct:((daysBetween(segS,segE)+1)/totalDays*100).toFixed(3)});
+            cur=nextM;
+        }
+        var html='<div class="gantt-wrapper">';
+        html+='<div class="gantt-row gantt-header-row"><div class="gantt-left-col"><div class="gh-act"><i class="fas fa-tasks" style="margin-right:5px;"></i>Plano</div><div class="gh-dias">Días</div></div>';
+        html+='<div class="gantt-timeline-col"><div class="gantt-months">';
+        segments.forEach(function(s){html+='<div class="gantt-month-seg" style="width:'+s.pct+'%">'+s.label+'</div>';});
+        html+='</div></div></div>';
+        var currentActId=null;
+        allPlanos.forEach(function(p){
+            if(p.actId!==currentActId){
+                currentActId=p.actId;
+                html+='<div class="gantt-row" style="background:'+p.actColor+'22;border-left:4px solid '+p.actColor+';">';
+                html+='<div class="gantt-left-col" style="padding:5px 10px;"><div class="gh-act" style="font-weight:700;font-size:.78rem;color:#374151;"><i class="fas fa-layer-group" style="margin-right:4px;color:'+p.actColor+'"></i>'+escHtml(p.actNome)+'</div><div class="gh-dias" style="font-size:.75rem;color:#888">act.</div></div>';
+                html+='<div class="gantt-timeline-col"><div class="gantt-bar-track" style="background:transparent;"></div></div></div>';
+            }
+            var offsetPct=(daysBetween(pStart,p.fi)/totalDays*100).toFixed(3);
+            var widthPct=(Math.ceil(p.dias)/totalDays*100).toFixed(3);
+            var tooltip=fmtDate(p.fi)+' → '+fmtDate(p.ff)+' ('+p.dias+' días / '+(p.dias*8)+'h)';
+            var barLabel=fmtShort(p.fi)+' – '+fmtShort(p.ff);
+            html+='<div class="gantt-row gantt-act-row">';
+            html+='<div class="gantt-left-col"><div class="gh-act" style="padding-left:18px;font-size:.82rem;"><span class="act-dot" style="background:'+p.actColor+'"></span>'+escHtml(p.cod?p.cod:p.desc)+'</div><div class="gh-dias">'+p.dias+'</div></div>';
+            html+='<div class="gantt-timeline-col"><div class="gantt-bar-track"><div class="gantt-bar" style="margin-left:'+offsetPct+'%;width:'+widthPct+'%;background:'+p.actColor+';" title="'+escHtml(tooltip)+'"><span class="gantt-bar-label">'+barLabel+'</span></div></div></div></div>';
+        });
+        var totalDiasSum=allPlanos.reduce(function(s,p){return s+p.dias;},0);
+        html+='<div class="gantt-row gantt-summary-row"><div class="gantt-left-col"><div class="gh-act"><strong>Total Proyecto</strong></div><div class="gh-dias"><strong>'+totalDiasSum+'</strong></div></div>';
+        html+='<div class="gantt-timeline-col"><div class="gantt-summary-info"><i class="fas fa-calendar-check"></i> '+fmtDate(pStart)+' → '+fmtDate(pEnd)+' &nbsp;|&nbsp; <strong>'+totalDays+'</strong> días calendario &nbsp;|&nbsp; <strong>'+(totalDiasSum*8)+'h</strong></div></div></div>';
+        html+='</div>';
+        container.innerHTML=html;
+        document.getElementById('ganttBadge').textContent=allPlanos.length+' planos';
+        section.style.display='';
+    }
+
+    /* ─── Proyectos finalizados ──────────────────────────────────────── */
+    function toggleFinalizados() {
+        var body=document.getElementById('finalizadosBody');
+        body.style.display=body.style.display==='none'?'':'none';
+        if(!_finalizadosCargados&&body.style.display!=='none'){
+            _finalizadosCargados=true;
+            fetch(API_FINALIZADOS)
+                .then(function(r){return r.json();})
+                .then(function(data){
+                    var lista=Array.isArray(data)?data:[];
+                    document.getElementById('finalizadosBadge').textContent=lista.length+' proyecto'+(lista.length!==1?'s':'');
+                    document.getElementById('finalizadosLoading').style.display='none';
+                    if(!lista.length){document.getElementById('finalizadosEmpty').style.display='';return;}
+                    document.getElementById('finalizadosWrapper').style.display='';
+                    var html='';
+                    lista.forEach(function(r){
+                        var ot=encodeURIComponent(r.ot);
+                        html+='<tr>'+
+                            '<td><strong>'+escHtml(r.ot)+'</strong></td>'+
+                            '<td>'+escHtml(r.proyecto)+'</td>'+
+                            '<td>'+(r.elaborado_por?escHtml(r.elaborado_por):'—')+'</td>'+
+                            '<td>'+(r.actualizado_al?fmtDateStr(r.actualizado_al):'—')+'</td>'+
+                            '<td style="text-align:center;">'+
+                              '<a href="../../api/fh_ing/exportar_gantt.php?ot='+ot+'" target="_blank" '+
+                                'style="display:inline-flex;align-items:center;gap:5px;background:#1a7a3c;color:#fff;border-radius:6px;padding:5px 11px;font-size:.79rem;font-weight:600;text-decoration:none;white-space:nowrap;" '+
+                                'title="Descargar Excel con Diagrama de Gantt">'+
+                                '<i class="fas fa-file-excel"></i> Excel / Gantt'+
+                              '</a>'+
+                            '</td>'+
+                            '</tr>';
+                    });
+                    document.getElementById('tblFinalizadosBody').innerHTML=html;
+                })
+                .catch(function(){
+                    document.getElementById('finalizadosLoading').innerHTML='<i class="fas fa-exclamation-triangle"></i><p>Error al cargar.</p>';
+                });
+        }
+    }
+
+    /* ═══ ANTECEDENTES MODAL ════════════════════════════════════════════ */
+    function _cargarAntCount(actId){
+        if(!selectedOT) return;
+        fetch(API_ANT_LIST+'?ot='+encodeURIComponent(selectedOT)+'&actividad_id='+encodeURIComponent(actId))
+            .then(function(r){return r.json();})
+            .then(function(data){
+                var n=(data.archivos||[]).length;
+                var el=document.getElementById('antCountBadge_'+actId);
+                if(el) el.innerHTML='<i class="fas fa-paperclip"></i> '+n+' '+(n===1?'archivo':'archivos');
+            }).catch(function(){});
+    }
+    function _abrirAnt(actId, actNombre){
+        _antActId=actId; _antActNombre=actNombre||'Actividad 1';
+        document.getElementById('antHeaderSub').textContent=_antActNombre+' — '+selectedOT;
+        document.getElementById('antAlert').innerHTML='';
+        document.getElementById('antUploadProgress').innerHTML='';
+        document.getElementById('antUploadProgress').style.display='none';
+        document.getElementById('antOverlay').classList.add('open');
+        document.body.style.overflow='hidden';
+        _cargarAntArchivos();
+    }
+    function _cerrarAnt(){
+        document.getElementById('antOverlay').classList.remove('open');
+        document.body.style.overflow='';
+    }
+    function _antFileIcon(ext){
+        var cad=['dwg','dxf','dws','dwt'];
+        var img=['jpg','jpeg','png','gif','bmp','tif','tiff','webp'];
+        var zip=['zip','rar','7z'];
+        var doc=['doc','docx','txt'];
+        var xls=['xls','xlsx'];
+        if(cad.indexOf(ext)>=0) return {icon:'fas fa-drafting-compass', cls:'t-cad', label:'CAD'};
+        if(ext==='pdf')          return {icon:'fas fa-file-pdf',        cls:'t-pdf', label:'PDF'};
+        if(img.indexOf(ext)>=0)  return {icon:'fas fa-image',           cls:'t-img', label:'IMG'};
+        if(zip.indexOf(ext)>=0)  return {icon:'fas fa-file-archive',    cls:'t-zip', label:'ZIP'};
+        if(doc.indexOf(ext)>=0)  return {icon:'fas fa-file-alt',        cls:'t-doc', label:'DOC'};
+        if(xls.indexOf(ext)>=0)  return {icon:'fas fa-file-excel',      cls:'t-xls', label:'XLS'};
+        return {icon:'fas fa-file', cls:'t-other', label:ext.toUpperCase()||'?'};
+    }
+    function _antFmtSize(bytes){
+        if(bytes>1024*1024) return (bytes/1024/1024).toFixed(1)+' MB';
+        return Math.ceil(bytes/1024)+' KB';
+    }
+    function _cargarAntArchivos(){
+        var grid=document.getElementById('antGrid');
+        var empty=document.getElementById('antEmpty');
+        var cntEl=document.getElementById('antCount');
+        grid.querySelectorAll('.ant-file-card').forEach(function(e){e.remove();});
+        if(empty) empty.style.display='flex';
+        document.getElementById('antAlert').innerHTML='';
+        fetch(API_ANT_LIST+'?ot='+encodeURIComponent(selectedOT)+'&actividad_id='+encodeURIComponent(_antActId))
+            .then(function(r){
+                var ct=r.headers.get('content-type')||'';
+                if(!ct.includes('json')){ return r.text().then(function(t){ throw new Error('Respuesta no-JSON del servidor. ¿Las tablas SQL están creadas? Detalle: '+t.substring(0,120)); }); }
+                return r.json();
+            })
+            .then(function(data){
+                var list=data.archivos||[];
+                cntEl.innerHTML='<i class="fas fa-paperclip"></i> '+list.length+' '+(list.length===1?'archivo':'archivos');
+                // update table badge
+                var badge=document.getElementById('antCountBadge_'+_antActId);
+                if(badge) badge.innerHTML='<i class="fas fa-paperclip"></i> '+list.length+' '+(list.length===1?'archivo':'archivos');
+                if(!list.length){ if(empty) empty.style.display='flex'; return; }
+                if(empty) empty.style.display='none';
+                list.forEach(function(f){
+                    var ext=(f.nombre_original||'').split('.').pop().toLowerCase();
+                    var ico=_antFileIcon(ext);
+                    var isImg=['jpg','jpeg','png','gif','bmp','webp'].indexOf(ext)>=0;
+                    var isPdf=ext==='pdf';
+                    var card=document.createElement('div'); card.className='ant-file-card';
+                    card.innerHTML=
+                        '<span class="afc-badge '+ico.cls+'">'+ico.label+'</span>'+
+                        '<div class="afc-icon '+ico.cls+'"><i class="'+ico.icon+'"></i></div>'+
+                        '<div class="afc-name" title="'+escHtml(f.nombre_original||'')+'">'+escHtml(f.nombre_original||'')+'</div>'+
+                        '<div class="afc-meta">'+escHtml(f.usuario||'')+' · '+_antFmtSize(parseInt(f.tamano||0))+'</div>'+
+                        '<div class="afc-meta">'+escHtml(f.fecha_str||'')+'</div>'+
+                        '<div class="afc-actions">'+
+                          '<a class="afc-btn dl" href="'+API_ANT_DOWN+'?id='+f.id+'" target="_blank" title="Descargar"><i class="fas fa-download"></i></a>'+
+                          ((isImg||isPdf)?'<a class="afc-btn dl" href="'+API_ANT_DOWN+'?id='+f.id+'&inline=1" target="_blank" title="Ver"><i class="fas fa-eye"></i></a>':'')+
+                          '<button class="afc-btn del" onclick="_antDelArchivo('+f.id+')" title="Eliminar"><i class="fas fa-trash"></i></button>'+
+                        '</div>';
+                    grid.appendChild(card);
+                });
+            }).catch(function(err){
+                document.getElementById('antAlert').innerHTML='<span style="color:#e74c3c"><b>Error al cargar archivos:</b> '+(err&&err.message?escHtml(err.message):'Verifica que la tabla fh_ing_ant_archivos existe en la BD')+'</span>';
+            });
+    }
+    function _antFilesSelected(files){
+        if(!files||!files.length) return;
+        if(!selectedOT){ document.getElementById('antAlert').innerHTML='<span style="color:#e74c3c">Selecciona una OT primero.</span>'; return; }
+        var prog=document.getElementById('antUploadProgress');
+        prog.innerHTML=''; prog.style.display='block';
+        document.getElementById('antAlert').innerHTML='';
+        var arr=Array.from(files);
+        var done=0;
+        arr.forEach(function(file){
+            var item=document.createElement('div'); item.className='ant-prog-item';
+            item.innerHTML='<span style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(file.name)+'</span>'+
+                '<div class="ant-prog-bar-wrap"><div class="ant-prog-bar" style="width:0%"></div></div>'+
+                '<span class="ant-prog-status">0%</span>';
+            prog.appendChild(item);
+            var bar=item.querySelector('.ant-prog-bar');
+            var stat=item.querySelector('.ant-prog-status');
+            var fd=new FormData();
+            fd.append('file', file);
+            fd.append('ot', selectedOT);
+            fd.append('actividad_id', _antActId);
+            var xhr=new XMLHttpRequest();
+            xhr.open('POST', API_ANT_UPLOAD);
+            xhr.upload.addEventListener('progress', function(e){
+                if(e.lengthComputable){var pct=Math.round(e.loaded/e.total*100); bar.style.width=pct+'%'; stat.textContent=pct+'%';}
+            });
+            xhr.onload=function(){
+                done++;
+                try{ var res=JSON.parse(xhr.responseText);
+                    if(res.ok){ bar.style.width='100%'; stat.style.color='#27ae60'; stat.textContent='✓'; }
+                    else{ stat.style.color='#e74c3c'; stat.textContent='Error'; document.getElementById('antAlert').innerHTML='<span style="color:#e74c3c"><b>Error al subir:</b> '+(res.error||'Respuesta inesperada del servidor')+'</span>'; }
+                }catch(e){ stat.style.color='#e74c3c'; stat.textContent='Error'; document.getElementById('antAlert').innerHTML='<span style="color:#e74c3c"><b>Error del servidor:</b> '+escHtml(xhr.responseText.substring(0,200))+'</span>'; }
+                if(done===arr.length){ setTimeout(function(){ prog.style.display='none'; prog.innerHTML=''; _cargarAntArchivos(); },1200); }
+            };
+            xhr.onerror=function(){ done++; stat.style.color='#e74c3c'; stat.textContent='Fallo'; document.getElementById('antAlert').innerHTML='<span style="color:#e74c3c">Error de red al subir archivos.</span>'; if(done===arr.length){ setTimeout(function(){ prog.style.display='none'; prog.innerHTML=''; _cargarAntArchivos(); },1200); } };
+            xhr.send(fd);
+        });
+    }
+    function _antDelArchivo(id){
+        if(!confirm('¿Eliminar este archivo? Esta acción no se puede deshacer.')) return;
+        fetch(API_ANT_DEL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
+            .then(function(r){return r.json();})
+            .then(function(data){
+                if(data.success){ _cargarAntArchivos(); }
+                else{ document.getElementById('antAlert').innerHTML='<span style="color:#e74c3c">Error al eliminar.</span>'; }
+            }).catch(function(){ document.getElementById('antAlert').innerHTML='<span style="color:#e74c3c">Error de conexión.</span>'; });
+    }
+    window._verObsImg=function(id){ window.open(API_OBS_IMG_VER+'?id='+id,'_blank'); };
+
+    /* ═══ HISTORIAL DWG ════════════════════════════════════════════════ */
+    function _abrirHistorial(idPlanos, codPlano) {
+        _histIdPlanos = idPlanos;
+        _histCodPlano = codPlano;
+        document.getElementById('histSubtitle').textContent = codPlano;
+        var body = document.getElementById('histBody');
+        body.innerHTML = '<div id="histLoading"><i class="fas fa-spinner fa-spin" style="font-size:1.5rem;margin-bottom:8px;display:block;"></i>Cargando historial…</div>';
+        document.getElementById('histOverlay').classList.add('open');
+        _cargarHistorial();
+    }
+    function _cerrarHistorial() {
+        document.getElementById('histOverlay').classList.remove('open');
+    }
+    function _cargarHistorial() {
+        fetch(API_DWG_HIST + '?id_planos=' + encodeURIComponent(_histIdPlanos))
+            .then(function(r){ return r.json(); })
+            .then(function(data) {
+                if (!data.success) { _histRenderError(data.error || 'Error'); return; }
+                // Subtitle
+                document.getElementById('histSubtitle').textContent =
+                    (data.cod_plano || '') + (data.desc_plano ? ' · ' + data.desc_plano : '');
+
+                var body = document.getElementById('histBody');
+                body.innerHTML = '';
+
+                var historial = data.historial || [];   // versiones antiguas desc
+                var actual    = data.actual || null;
+
+                if (!historial.length) {
+                    body.innerHTML = '<div id="histEmpty"><i class="fas fa-folder-open"></i>Solo hay una versión de este plano.<br><small>Cuando cambies el archivo CAD, las versiones anteriores aparecerán aquí.</small></div>';
+                    return;
+                }
+
+                var totalVer = historial.length + 1; // +1 for current
+
+                // ── Versión actual (siempre arriba) ──────────────────
+                var currName = actual ? (actual.arch_original || actual.arch_plano || '—') : '—';
+                var currBaseName = currName.split('/').pop();
+                var currExt  = currBaseName.split('.').pop().toLowerCase();
+                var currExt2 = _histExtClass(currExt);
+                var currCard = '<div class="hv-entry current-ver">' +
+                    '<div class="hv-dot current">v' + totalVer + '</div>' +
+                    '<div class="hv-card">' +
+                    '<div class="hv-card-top">' +
+                    '<span class="hv-badge-curr">ACTUAL</span>' +
+                    '<span class="hv-filename">' + _escH(currBaseName) + '</span>' +
+                    '<span class="hv-ext ' + currExt2 + '">' + currExt.toUpperCase() + '</span>' +
+                    '</div>' +
+                    '<div class="hv-meta"><i class="fas fa-calendar-alt"></i> Versión vigente</div>' +
+                    '<div class="hv-actions">' +
+                    (actual && actual.arch_plano ? '<a class="hv-btn view" href="' + _histViewUrl(actual.arch_plano) + '" target="_blank"><i class="fas fa-eye"></i> Ver</a>' : '') +
+                    (actual && actual.arch_plano ? '<a class="hv-btn dl" href="' + _histDlUrl(actual.arch_plano) + '"><i class="fas fa-download"></i> Descargar</a>' : '') +
+                    '</div>' +
+                    '</div></div>';
+                body.insertAdjacentHTML('beforeend', currCard);
+
+                // ── Versiones anteriores ─────────────────────────────
+                historial.forEach(function(h, idx) {
+                    var vnum  = totalVer - 1 - idx; // e.g. v2, v1...
+                    var fname = h.arch_original || h.arch_plano || '—';
+                    var bname = fname.split('/').pop();
+                    var ext   = bname.split('.').pop().toLowerCase();
+                    var extC  = _histExtClass(ext);
+                    var size  = h.tamano ? _histFmtSize(h.tamano) : '';
+                    var meta  = [h.usuario, h.fecha_str, size].filter(Boolean).join(' · ');
+                    var card  = '<div class="hv-entry">' +
+                        '<div class="hv-dot old">v' + vnum + '</div>' +
+                        '<div class="hv-card">' +
+                        '<div class="hv-card-top">' +
+                        '<span class="hv-badge-ver">v' + vnum + '</span>' +
+                        '<span class="hv-filename">' + _escH(bname) + '</span>' +
+                        '<span class="hv-ext ' + extC + '">' + ext.toUpperCase() + '</span>' +
+                        '</div>' +
+                        '<div class="hv-meta"><i class="fas fa-user"></i> ' + _escH(meta) + '</div>' +
+                        '<div class="hv-actions">' +
+                        '<a class="hv-btn view" href="' + API_HIST_DOWN + '?id=' + h.id + '&ver=1" target="_blank"><i class="fas fa-eye"></i> Ver</a>' +
+                        '<a class="hv-btn dl"   href="' + API_HIST_DOWN + '?id=' + h.id + '"       ><i class="fas fa-download"></i> Descargar</a>' +
+                        '</div>' +
+                        '</div></div>';
+                    body.insertAdjacentHTML('beforeend', card);
+                });
+            })
+            .catch(function(e) { _histRenderError(e.message); });
+    }
+    function _histRenderError(msg) {
+        document.getElementById('histBody').innerHTML =
+            '<div id="histEmpty"><i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i>' + _escH(msg) + '</div>';
+    }
+    function _histFmtSize(bytes) {
+        if (!bytes) return '';
+        if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+        if (bytes >= 1024)    return (bytes / 1024).toFixed(0) + ' KB';
+        return bytes + ' B';
+    }
+    function _histExtClass(ext) {
+        if (['dwg','dxf','dws','dwt'].indexOf(ext) >= 0) return 't-cad';
+        if (ext === 'pdf') return 't-pdf';
+        return 't-other';
+    }
+    function _histViewUrl(arch) {
+        // Use existing diag_ver_plano for viewing CAD files
+        var ext = (arch.split('.').pop() || '').toLowerCase();
+        if (['dwg','dxf','dws','dwt'].indexOf(ext) >= 0)
+            return '../../api/fh_ing/diag_ver_plano.php?id=' + _histIdPlanos;
+        return '#';
+    }
+    function _histDlUrl(arch) {
+        return '../../api/fh_ing/descargar_plano_dwg.php?id=' + _histIdPlanos;
+    }
+    function _escH(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ═══ VISOR DE ARCHIVOS ════════════════════════════════════════════ */
+    var PREVIEW_EXTS=['dxf','dwg','dws','dwt'];
+    var _threeDxfRenderer=null;
+    var _dxfParsed=null;
+
+    function _visorReset() {
+        if(_pendingTimer){clearInterval(_pendingTimer);_pendingTimer=null;}
+        if(_apsPollTimer){clearTimeout(_apsPollTimer);_apsPollTimer=null;}
+        document.getElementById('fileViewerIframe').style.display='none';
+        document.getElementById('fileViewerIframe').src='about:blank';
+        document.getElementById('fileViewerDxfCanvas').style.display='none';
+        document.getElementById('fileViewerDxfCanvas').innerHTML='';
+        document.getElementById('fileViewerApsCanvas').style.display='none';
+        var tabs=document.getElementById('apsSheetTabs'); if(tabs) tabs.remove();
+        document.getElementById('fileViewerFallback').style.display='none';
+        document.getElementById('fileViewerLoading').style.display='none';
+    }
+
+    function abrirVisor(id, nombre, codPlano) {
+        var overlay=document.getElementById('fileViewerOverlay');
+        var ext=(nombre||'').split('.').pop().toLowerCase();
+        var isCad=PREVIEW_EXTS.indexOf(ext)!==-1;
+        document.getElementById('fileViewerTitle').textContent=nombre||'Archivo';
+        var dlBtn=document.getElementById('fileViewerDownload');
+        dlBtn.href=API_DOWN+'?id='+encodeURIComponent(id);
+        dlBtn.setAttribute('download',nombre||'archivo');
+        _obsIdPlanos=parseInt(id,10)||0; _obsCodPlano=codPlano||'';
+        if(_obsPanelOpen) _cargarObs(_obsIdPlanos);
+        overlay.classList.add('open'); document.body.style.overflow='hidden';
+        _visorReset();
+        if(isCad){document.getElementById('fileViewerLoading').style.display='flex'; renderizarDXF(id, nombre);}
+        else{var iframe=document.getElementById('fileViewerIframe'); iframe.style.display='block'; iframe.src=API_DOWN+'?id='+encodeURIComponent(id)+'&ver=1';}
+    }
+
+    function cerrarVisor() {
+        document.getElementById('fileViewerOverlay').classList.remove('open');
+        document.body.style.overflow=''; _visorReset(); _setObsPanel(false);
+    }
+
+    function renderizarDXF(id, nombre) {
+        if(APS_ENABLED) _renderizarConAPS(id, nombre); else _renderizarConThreeDxf(id, nombre);
+    }
+
+    function _renderizarConAPS(id, nombre) {
+        var loading=document.getElementById('fileViewerLoading');
+        var apsCanvas=document.getElementById('fileViewerApsCanvas');
+        var dxfCanvas=document.getElementById('fileViewerDxfCanvas');
+        var progressBar=document.getElementById('apsProgressBar');
+        var progressMsg=document.getElementById('apsProgressMsg');
+        loading.style.display='flex'; apsCanvas.style.display='none'; dxfCanvas.style.display='none';
+        if(_apsPollTimer){clearTimeout(_apsPollTimer);_apsPollTimer=null;}
+        var _apsStartTime=Date.now();
+        var _apsFallbackShown=false;
+        function pollEnsure(){
+            fetch(API_APS_ENSURE+'?id='+encodeURIComponent(id))
+                .then(function(r){return r.json();})
+                .then(function(data){
+                    if(data.status==='success'){_apsFallbackShown=false;_loadApsViewer(data.urn,apsCanvas,loading);}
+                    else if(data.status==='failed'){loading.style.display='none';_renderizarConThreeDxf(id,nombre);}
+                    else{
+                        loading.style.display='none'; apsCanvas.style.display='block';
+                        progressBar.style.width=Math.max(data.progress||0,2)+'%';
+                        // Mensaje según etapa
+                        var secs=Math.round((Date.now()-_apsStartTime)/1000);
+                        var msg=data.message||'Procesando…';
+                        if(data.progress<=3){msg='Subiendo archivo a la nube… ('+secs+'s)';}
+                        else if(data.progress<100){msg='Traduciendo plano: '+(data.progress||0)+'% ('+secs+'s)';}
+                        progressMsg.textContent=msg;
+                        // Mostrar botón de descarga si lleva más de 90 segundos
+                        if(!_apsFallbackShown && secs>90){
+                            _apsFallbackShown=true;
+                            var dlHtml='<div style="margin-top:8px;font-size:12px;color:#888;">Procesando en segundo plano…'+
+                                '<a href="'+API_DOWN+'?id='+encodeURIComponent(id)+'" download="'+(nombre||'plano')+
+                                '" style="margin-left:6px;color:#3498db;">Descargar DWG</a></div>';
+                            var existing=apsCanvas.querySelector('.aps-dl-hint');
+                            if(!existing){var el=document.createElement('div');el.className='aps-dl-hint';el.innerHTML=dlHtml;apsCanvas.appendChild(el);}
+                        }
+                        _apsPollTimer=setTimeout(pollEnsure,3000);
+                    }
+                })
+                .catch(function(){loading.style.display='none';_renderizarConThreeDxf(id,nombre);});
+        }
+        pollEnsure();
+    }
+
+    function _loadApsViewer(urn, container, loading) {
+        document.getElementById('apsProgressBar').style.width='0%';
+        document.getElementById('apsProgressMsg').textContent='';
+        function _initAndLoad(){
+            if(_apsViewer){_apsLoadDoc(_apsViewer,urn);return;}
+            Autodesk.Viewing.Initializer({env:'AutodeskProduction2',api:'streamingV2',
+                getAccessToken:function(cb){fetch(API_APS_TOKEN).then(function(r){return r.json();}).then(function(d){cb(d.access_token,d.expires_in);}).catch(function(){cb('',0);});}
+            },function(){
+                _apsViewer=new Autodesk.Viewing.GuiViewer3D(container,{extensions:['Autodesk.DocumentBrowser']});
+                if(_apsViewer.start()>0){loading.style.display='none';_renderizarConThreeDxf(null,null);return;}
+                _apsLoadDoc(_apsViewer,urn);
+            });
+        }
+        if(typeof Autodesk==='undefined'){
+            var link=document.createElement('link');link.rel='stylesheet';link.href='https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.min.css';document.head.appendChild(link);
+            var script=document.createElement('script');script.src='https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.min.js';
+            script.onload=function(){loading.style.display='none';container.style.display='block';_initAndLoad();};
+            script.onerror=function(){loading.style.display='none';_renderizarConThreeDxf(null,null);};
+            document.body.appendChild(script);
+        } else {loading.style.display='none';container.style.display='block';_initAndLoad();}
+    }
+
+    function _apsLoadDoc(viewer, urn) {
+        Autodesk.Viewing.Document.load('urn:'+urn,function(doc){
+            var root=doc.getRoot();
+            var views2d=root.search({type:'geometry',role:'2d'}); var views3d=root.search({type:'geometry',role:'3d'});
+            var allViews=views2d.concat(views3d); if(!allViews.length) allViews=root.search({type:'geometry'});
+            if(!allViews.length) return;
+            var defaultView=views2d.length?views2d[0]:allViews[0];
+            viewer.loadDocumentNode(doc,defaultView);
+            if(allViews.length>1) _buildApsSheetTabs(viewer,doc,allViews,0);
+        },function(code,msg){console.warn('[APS]',code,msg);});
+    }
+
+    function _buildApsSheetTabs(viewer, doc, views, activeIdx) {
+        var ex=document.getElementById('apsSheetTabs'); if(ex) ex.remove();
+        var tabsDiv=document.createElement('div'); tabsDiv.id='apsSheetTabs';
+        tabsDiv.style.cssText='position:absolute;top:0;left:0;right:0;z-index:100;background:#1a1e23;border-bottom:1px solid #333;display:flex;overflow-x:auto;flex-shrink:0;';
+        views.forEach(function(view,idx){
+            var tab=document.createElement('button'); tab.textContent=view.data.name||('Vista '+(idx+1)); tab.dataset.idx=idx;
+            tab.style.cssText='padding:5px 14px;background:'+(idx===activeIdx?'#27ae60':'transparent')+';color:#ddd;border:none;border-right:1px solid #333;cursor:pointer;white-space:nowrap;font-size:12px;flex-shrink:0;';
+            tab.addEventListener('click',function(){
+                viewer.loadDocumentNode(doc,view);
+                Array.from(tabsDiv.children).forEach(function(b){b.style.background='transparent';b.style.color='#ddd';});
+                tab.style.background='#27ae60'; tab.style.color='#fff';
+            });
+            tabsDiv.appendChild(tab);
+        });
+        document.getElementById('fileViewerApsCanvas').appendChild(tabsDiv);
+    }
+
+    function _destroyRenderer(){
+        if(_threeDxfRenderer){try{_threeDxfRenderer.dispose?_threeDxfRenderer.dispose():null;}catch(e){}_threeDxfRenderer=null;}
+    }
+    function _getLayouts(dxf){
+        var allEnts=dxf.entities||[]; var modelEnts=allEnts.filter(function(e){return !e.inPaperSpace;});
+        return [{name:'Model',entities:modelEnts.length?modelEnts:allEnts}];
+    }
+    function _mountLayout(layoutEntities, viewport){
+        _destroyRenderer(); viewport.innerHTML='';
+        var container=document.getElementById('fileViewerDxfCanvas');
+        var w=container.offsetWidth||900; var h=Math.max(480,Math.round(w*0.6));
+        viewport.style.width=w+'px'; viewport.style.height=h+'px';
+        var dxfCopy={}; for(var k in _dxfParsed){if(_dxfParsed.hasOwnProperty(k))dxfCopy[k]=_dxfParsed[k];}
+        dxfCopy.entities=layoutEntities;
+        try{_threeDxfRenderer=new ThreeDxf.Viewer(dxfCopy,viewport,w,h,{font:null});}
+        catch(e){viewport.innerHTML='<div style="color:#e74c3c;padding:20px;">Error: '+e.message+'</div>';}
+    }
+    function _renderizarConThreeDxf(id, nombre){
+        var container=document.getElementById('fileViewerDxfCanvas');
+        var loading=document.getElementById('fileViewerLoading');
+        loading.style.display='flex'; container.style.display='none'; container.innerHTML='';
+        _destroyRenderer(); _dxfParsed=null;
+        if(!id){loading.style.display='none';_visorShowFallback('APS Viewer no disponible',null,nombre);return;}
+        fetch(API_DXF+'?id='+encodeURIComponent(id))
+            .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.text();})
+            .then(function(dxfText){
+                var parser=new DxfParser();
+                try{_dxfParsed=parser.parseSync(dxfText);}catch(e){throw new Error('Error al parsear DXF: '+e.message);}
+                var layouts=_getLayouts(_dxfParsed);
+                container.style.display='block';
+                var viewport=document.createElement('div'); viewport.id='threeDxfViewport'; container.appendChild(viewport);
+                loading.style.display='none'; _mountLayout(layouts[0].entities,viewport);
+            })
+            .catch(function(err){loading.style.display='none';_renderizarDXFcomoSVG(id,nombre);});
+    }
+    function _renderizarDXFcomoSVG(id, nombre){
+        var canvas=document.getElementById('fileViewerDxfCanvas');
+        var loading=document.getElementById('fileViewerLoading');
+        loading.style.display='flex';
+        fetch(API_VER+'?id='+encodeURIComponent(id),{cache:'no-store'})
+            .then(function(r){
+                var ct=r.headers.get('Content-Type')||'';
+                if(ct.indexOf('json')!==-1)return r.json().then(function(d){if(d.error==='pending')throw new Error('__pending__');throw new Error(d.error||'Error');});
+                if(!r.ok)throw new Error('HTTP '+r.status);return r.text();
+            })
+            .then(function(svg){
+                if(!svg||svg.indexOf('<svg')===-1)throw new Error('SVG inválido');
+                canvas.innerHTML=svg;
+                var svgEl=canvas.querySelector('svg');
+                if(svgEl){svgEl.removeAttribute('width');svgEl.removeAttribute('height');svgEl.style.cssText='width:100%;height:auto;display:block;';svgEl.setAttribute('preserveAspectRatio','xMidYMid meet');}
+                loading.style.display='none'; canvas.style.display='block';
+            })
+            .catch(function(err){
+                var msg=err.message||'';
+                if(msg==='__pending__'){_visorShowPending(id,nombre);return;}
+                loading.style.display='none'; _visorShowFallback(msg,id,nombre);
+            });
+    }
+    function _visorShowPending(id, nombre){
+        document.getElementById('fileViewerLoading').style.display='none';
+        var fb=document.getElementById('fileViewerFallback');
+        fb.style.display='flex';
+        fb.innerHTML='<div class="fvf-icon"><i class="fas fa-cog fa-spin"></i></div>'+
+            '<div class="fvf-title">Previsualización en generación</div>'+
+            '<div class="fvf-msg">El archivo está siendo convertido. Reintentando en <span id="pendingCountdown">15</span>s…</div>';
+        var secs=15;
+        if(_pendingTimer) clearInterval(_pendingTimer);
+        _pendingTimer=setInterval(function(){
+            secs--; var cd=document.getElementById('pendingCountdown'); if(cd) cd.textContent=secs;
+            if(secs<=0){clearInterval(_pendingTimer);_pendingTimer=null;
+                if(document.getElementById('fileViewerOverlay').classList.contains('open')){fb.style.display='none';document.getElementById('fileViewerLoading').style.display='flex';renderizarDXF(id,nombre);}
+            }
+        },1000);
+    }
+    function _visorShowFallback(errMsg, id, nombre){
+        var titleEl=document.getElementById('fvfTitle'); var msgEl=document.getElementById('fvfMsg'); var dlBtn=document.getElementById('fvfDownloadBtn');
+        if(id){dlBtn.href=API_DOWN+'?id='+encodeURIComponent(id);dlBtn.setAttribute('download',nombre||'archivo');}
+        titleEl.textContent='No se pudo previsualizar el archivo';
+        msgEl.innerHTML=(errMsg||'Error al procesar.')+' Descárgalo para abrirlo con un programa compatible.';
+        document.getElementById('fileViewerFallback').style.display='flex';
+    }
+
+    /* ─── Anotaciones ────────────────────────────────────────────────── */
+    function _setObsPanel(open){
+        _obsPanelOpen=open;
+        var panel=document.getElementById('obsPanel'); var btn=document.getElementById('obsToggleBtn');
+        if(open){panel.style.display='flex';btn.classList.add('active');_cargarObs(_obsIdPlanos);}
+        else{panel.style.display='none';btn.classList.remove('active');}
+    }
+    function _cargarObs(id){
+        if(!id) return;
+        var wrap=document.getElementById('obsListWrap');
+        var loading=document.getElementById('obsLoading'); if(loading) loading.style.display='';
+        var empty=document.getElementById('obsEmpty'); if(empty) empty.style.display='none';
+        wrap.querySelectorAll('.obs-item').forEach(function(e){e.remove();});
+        fetch(API_OBS_GET+'?id_planos='+encodeURIComponent(id))
+            .then(function(r){return r.json();})
+            .then(function(data){
+                if(loading) loading.style.display='none';
+                var list=Array.isArray(data)?data:(data.obs||[]);
+                if(!list.length){if(empty) empty.style.display='';return;}
+                list.forEach(function(o){
+                    var div=document.createElement('div'); div.className='obs-item';
+                    var imgHtml='';
+                    if(o.imagenes&&o.imagenes.length){
+                        imgHtml='<div class="obs-img-row">';
+                        o.imagenes.forEach(function(im){
+                            imgHtml+='<img class="obs-thumb" src="'+API_OBS_IMG_VER+'?id='+im.id+'" title="'+escHtml(im.nombre)+'" onclick="window._verObsImg('+im.id+')">';
+                        });
+                        imgHtml+='</div>';
+                    }
+                    div.innerHTML='<div class="obs-item-meta"><span>'+escHtml(o.usuario||'')+'</span><span>'+escHtml(o.fecha||'')+'</span></div>'+
+                        '<div class="obs-item-text">'+escHtml(o.texto||'')+'</div>'+imgHtml;
+                    wrap.appendChild(div);
+                });
+            })
+            .catch(function(){if(loading)loading.style.display='none';});
+    }
+    function _guardarObs(){
+        var texto=document.getElementById('obsTexto').value.trim();
+        var msg=document.getElementById('obsMsg');
+        if(!texto){ msg.style.color='#e74c3c'; msg.textContent='Escribe una anotación antes de guardar.'; return; }
+        if(!_obsIdPlanos){ msg.style.color='#e74c3c'; msg.textContent='Guarda el plano primero para poder agregar anotaciones.'; return; }
+        var btn=document.getElementById('obsGuardar'); btn.disabled=true; msg.textContent='';
+        fetch(API_OBS_SAVE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id_planos:_obsIdPlanos,ot:selectedOT,cod_plano:_obsCodPlano,texto:texto})})
+            .then(function(r){return r.json();})
+            .then(function(data){
+                if(data.success){
+                    var newId=data.obs&&data.obs.id?data.obs.id:0;
+                    document.getElementById('obsTexto').value='';
+                    msg.style.color='#27ae60'; msg.textContent='✓ Nota guardada.';
+                    // upload pending images if any
+                    if(newId && _obsImgFiles.length){
+                        var uploads=_obsImgFiles.map(function(f){
+                            var fd=new FormData(); fd.append('image',f); fd.append('id_obs',newId);
+                            return fetch(API_OBS_IMG,{method:'POST',body:fd}).then(function(r){return r.json();});
+                        });
+                        Promise.all(uploads).then(function(){
+                            _obsImgFiles=[]; document.getElementById('obsImgPreview').innerHTML='';
+                            document.getElementById('obsImgInput').value='';
+                            _cargarObs(_obsIdPlanos);
+                        });
+                    } else {
+                        _obsImgFiles=[]; document.getElementById('obsImgPreview').innerHTML='';
+                        document.getElementById('obsImgInput').value='';
+                        _cargarObs(_obsIdPlanos);
+                    }
+                } else {
+                    msg.style.color='#e74c3c'; msg.textContent='Error: '+(data.error||data.message||'No se pudo guardar.');
+                }
+            })
+            .catch(function(){msg.style.color='#e74c3c';msg.textContent='Error de conexión.';})
+            .finally(function(){btn.disabled=false;});
+    }
+    function _obsImgSelected(filesArg){
+        var input=document.getElementById('obsImgInput');
+        var files = filesArg || input.files;
+        var preview=document.getElementById('obsImgPreview');
+        Array.from(files).forEach(function(f){
+            if(!f.type.match(/^image\//)) return;
+            _obsImgFiles.push(f);
+            var item=document.createElement('div'); item.className='obs-img-prev-item';
+            var url=URL.createObjectURL(f);
+            var idx=_obsImgFiles.length-1;
+            item.innerHTML='<img src="'+url+'"><button class="obs-img-prev-del" onclick="this.parentNode.remove();_obsImgFiles.splice('+idx+',1);" title="Quitar">&times;</button>';
+            preview.appendChild(item);
+        });
+        input.value='';
+    }
+
+    /* ─── Vista previa (backward compat) ────────────────────────────── */
+    function abrirPreview(evt, ot) {
+        if(evt){evt.stopPropagation();evt.preventDefault();}
+        var modal=document.getElementById('modalPreview');
+        if(!modal) return;
+        document.getElementById('modalOTLabel').textContent='OT: '+ot;
+        document.getElementById('modalProyLabel').textContent='Cargando…';
+        document.getElementById('modalEstadoBadge').textContent='';
+        document.getElementById('modalResumenMods').innerHTML='<span style="color:#6c757d;font-size:.85rem;"><i class="fas fa-spinner fa-spin"></i> Cargando resumen…</span>';
+        document.getElementById('modalGanttContainer').innerHTML='';
+        modal.style.display='';
+        fetch(API_RESUMEN+'?ot='+encodeURIComponent(ot))
+            .then(function(r){return r.json();})
+            .then(function(d){if(!d.success)throw new Error(d.message||'Error'); renderModalContenido(d);})
+            .catch(function(err){document.getElementById('modalResumenMods').innerHTML='<span style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> '+escHtml(err.message)+'</span>';});
+    }
+    function cerrarModal(){var m=document.getElementById('modalPreview');if(m)m.style.display='none';}
+    window.cerrarModal=cerrarModal; window.abrirPreview=abrirPreview;
+
+    var ESTADO_LABELS={'-1':'Sin cronograma','0':'En progreso','1':'En progreso','2':'Módulo 3','3':'Finalizado'};
+    var ESTADO_COLORS={'-1':'#6c757d','0':'#f39c12','1':'#2980b9','2':'#8e44ad','3':'#27ae60'};
+    var MOD_COLORS={
+        'm1':['#2980b9','#3498db','#1abc9c','#16a085','#27ae60','#1e8449','#2ecc71','#117a65'],
+        'm2':['#e67e22','#d35400','#e74c3c','#c0392b','#f39c12','#e67e22','#e84393','#9b59b6'],
+        'm3':['#8e44ad','#9b59b6','#6c3483','#a569bd','#7d3c98','#5b2c6f','#c39bd3','#7fb3d3'],
+    };
+
+    function renderModalContenido(d){
+        var estado=String(d.estado);
+        document.getElementById('modalProyLabel').textContent=d.proyecto||'—';
+        var badge=document.getElementById('modalEstadoBadge');
+        badge.textContent=ESTADO_LABELS[estado]||('Estado '+estado);
+        badge.style.background=ESTADO_COLORS[estado]||'#6c757d';
+        var resHtml=''; var modDefs=[
+            {key:'m1',icon:'fa-list-ol',label:'Módulo 1 — Actividades',color:'#2980b9'},
+            {key:'m2',icon:'fa-table',label:'Módulo 2 — Planos',color:'#e67e22'},
+            {key:'m3',icon:'fa-drafting-compass',label:'Módulo 3 — Detalle',color:'#8e44ad'},
+        ];
+        modDefs.forEach(function(m){
+            var mod=d[m.key]; if(!mod) return;
+            resHtml+='<div style="background:'+m.color+'18;border:1.5px solid '+m.color+'44;border-radius:8px;padding:10px 16px;min-width:180px;flex:1;">'+
+                '<div style="font-size:.78rem;font-weight:700;color:'+m.color+';margin-bottom:4px;"><i class="fas '+m.icon+'"></i> '+m.label+'</div>'+
+                '<div style="font-size:1.1rem;font-weight:700;color:#2c3e50;">'+mod.total_dias+' días</div>'+
+                (mod.fecha_inicio?'<div style="font-size:.75rem;color:#6c757d;">desde '+fmtDateStr(mod.fecha_inicio)+'</div>':'')+
+                '<div style="font-size:.75rem;color:#6c757d;">'+(mod.items?mod.items.length:0)+' elemento'+((mod.items||[]).length!==1?'s':'')+'</div>'+
+                '</div>';
+        });
+        document.getElementById('modalResumenMods').innerHTML=resHtml;
+        renderModalGantt(d);
+    }
+
+    function renderModalGantt(d){
+        var container=document.getElementById('modalGanttContainer');
+        var allItems=[]; var pStart=null, pEnd=null;
+        (d.m1&&d.m1.items||[]).forEach(function(r,i){
+            if(!r.fecha_inicio||!parseFloat(r.dias)) return;
+            var fi=parseDate(r.fecha_inicio); var ff=parseDate(r.fecha_fin);
+            if(!pStart||fi<pStart)pStart=fi; if(!pEnd||ff>pEnd)pEnd=ff;
+            allItems.push({label:r.nombre,dias:r.dias,fi:fi,ff:ff,mod:'m1',idx:i});
+        });
+        (d.m2&&d.m2.items||[]).forEach(function(r,i){
+            if(!r.fecha_inicio||!parseFloat(r.dias)) return;
+            var fi=parseDate(r.fecha_inicio); var ff=parseDate(r.fecha_fin);
+            if(!pStart||fi<pStart)pStart=fi; if(!pEnd||ff>pEnd)pEnd=ff;
+            allItems.push({label:r.cod_plano+(r.desc_plano?' — '+r.desc_plano:''),dias:r.dias,fi:fi,ff:ff,mod:'m2',idx:i});
+        });
+        if(d.m3&&d.m3.fecha_inicio){
+            var cursor3=parseDate(d.m3.fecha_inicio);
+            (d.m3.items||[]).forEach(function(r,i){
+                var dias=parseFloat(r.dias); if(!dias) return;
+                var fi=new Date(cursor3); var ff=addDays(fi,Math.ceil(dias)-1); cursor3=addDays(ff,1);
+                if(!pStart||fi<pStart)pStart=fi; if(!pEnd||ff>pEnd)pEnd=ff;
+                allItems.push({label:r.cod_plano+(r.desc_mod3?' — '+r.desc_mod3:''),dias:dias,fi:fi,ff:ff,mod:'m3',idx:i});
+            });
+        }
+        if(!allItems.length||!pStart||!pEnd){
+            container.innerHTML='<p style="color:#6c757d;padding:16px;font-size:.88rem;"><i class="fas fa-info-circle"></i> No hay datos suficientes.</p>'; return;
+        }
+        var totalDays=daysBetween(pStart,pEnd)+1;
+        var meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        var segments=[]; var cur=new Date(pStart.getFullYear(),pStart.getMonth(),1);
+        while(cur<=pEnd){
+            var segS=cur<pStart?pStart:new Date(cur); var nextM=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+            var segE=nextM>pEnd?pEnd:new Date(nextM.getTime()-86400000);
+            segments.push({label:meses[cur.getMonth()]+' '+cur.getFullYear(),pct:((daysBetween(segS,segE)+1)/totalDays*100).toFixed(3)});
+            cur=nextM;
+        }
+        var modLabels={m1:'Módulo 1',m2:'Módulo 2',m3:'Módulo 3'};
+        var modBg={m1:'#2980b9',m2:'#e67e22',m3:'#8e44ad'};
+        var html='<div class="gantt-wrapper">';
+        html+='<div class="gantt-row gantt-header-row"><div class="gantt-left-col"><div class="gh-act">Elemento</div><div class="gh-dias">Días</div></div>';
+        html+='<div class="gantt-timeline-col"><div class="gantt-months">';
+        segments.forEach(function(s){html+='<div class="gantt-month-seg" style="width:'+s.pct+'%">'+s.label+'</div>';});
+        html+='</div></div></div>';
+        var lastMod=null;
+        allItems.forEach(function(item){
+            if(item.mod!==lastMod){
+                lastMod=item.mod;
+                html+='<div class="gantt-row" style="background:'+modBg[item.mod]+'22;border-left:4px solid '+modBg[item.mod]+';"><div class="gantt-left-col" style="border-right-color:'+modBg[item.mod]+'44;"><div class="gh-act" style="font-weight:700;color:'+modBg[item.mod]+';font-size:.78rem;"><i class="fas fa-layer-group" style="margin-right:5px;"></i>'+modLabels[item.mod]+'</div><div class="gh-dias"></div></div><div class="gantt-timeline-col"></div></div>';
+            }
+            var color=MOD_COLORS[item.mod][item.idx%MOD_COLORS[item.mod].length];
+            var offset=(daysBetween(pStart,item.fi)/totalDays*100).toFixed(3);
+            var width=(Math.ceil(item.dias)/totalDays*100).toFixed(3);
+            var tooltip=fmtDate(item.fi)+' → '+fmtDate(item.ff)+' ('+item.dias+' días)';
+            var barLabel=fmtShort(item.fi)+' – '+fmtShort(item.ff);
+            html+='<div class="gantt-row gantt-act-row"><div class="gantt-left-col"><div class="gh-act"><span class="act-dot" style="background:'+color+'"></span>'+escHtml(item.label.substring(0,42))+'</div><div class="gh-dias">'+item.dias+'</div></div><div class="gantt-timeline-col"><div class="gantt-bar-track"><div class="gantt-bar" style="margin-left:'+offset+'%;width:'+width+'%;background:'+color+';" title="'+escHtml(tooltip)+'"><span class="gantt-bar-label">'+barLabel+'</span></div></div></div></div>';
+        });
+        var totalDiasSum=allItems.reduce(function(s,r){return s+r.dias;},0);
+        html+='<div class="gantt-row gantt-summary-row"><div class="gantt-left-col"><div class="gh-act"><strong>Total Proyecto</strong></div><div class="gh-dias"><strong>'+totalDiasSum+'</strong></div></div><div class="gantt-timeline-col"><div class="gantt-summary-info"><i class="fas fa-calendar-check"></i> '+fmtDate(pStart)+' → '+fmtDate(pEnd)+' &nbsp;|&nbsp; <strong>'+totalDays+'</strong> días calendario</div></div></div>';
+        html+='</div>';
+        container.innerHTML=html;
+    }
+
+    if(document.getElementById('modalPreview')){
+        document.getElementById('modalPreview').addEventListener('click', function(e){ if(e.target===this) cerrarModal(); });
+    }
+
+}());
+</script>
+
+<?php include_once dirname(dirname(__DIR__)) . '/layouts/footer.php'; ?>

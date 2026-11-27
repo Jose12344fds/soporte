@@ -1,0 +1,101 @@
+<?php
+declare(strict_types=1);
+
+ob_start();
+error_reporting(0);
+ini_set('display_errors', '0');
+header('Content-Type: application/json; charset=utf-8');
+
+require_once __DIR__.'/conexion_hana.php';
+require_once dirname(dirname(__DIR__)).'/includes/load.php';
+
+function pa_out(array $data, int $status=200): void {
+    while (ob_get_level()) ob_end_clean();
+    http_response_code($status);
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
+function pa_v($value): string { return trim((string)($value ?? '')); }
+function pa_nullable(string $value): ?string { return $value === '' ? null : $value; }
+function pa_date(string $value, bool $required=false): ?string {
+    $value=substr(pa_v($value),0,10);
+    if($value===''&&!$required)return null;
+    $dt=DateTime::createFromFormat('!Y-m-d',$value);
+    if(!$dt||$dt->format('Y-m-d')!==$value)throw new InvalidArgumentException('Fecha inválida.');
+    return $value;
+}
+function pa_time(string $value): ?int {
+    $value=pa_v($value); if($value==='')return null;
+    if(!preg_match('/^(\d{1,2}):(\d{2})$/',$value,$m))throw new InvalidArgumentException('Hora inválida.');
+    $h=(int)$m[1];$i=(int)$m[2];if($h>23||$i>59)throw new InvalidArgumentException('Hora inválida.');
+    return $h*100+$i;
+}
+function pa_has_column(PDO $pdo,string $table,string $column): bool {
+    try{$pdo->prepare('SELECT "'.str_replace('"','""',$column).'" FROM "SBO_TAMAING_PRODUC"."'.str_replace('"','""',$table).'" WHERE 1=0');return true;}catch(Throwable $e){return false;}
+}
+function pa_has_table(PDO $pdo,string $table): bool {
+    try{$pdo->prepare('SELECT 1 FROM "SBO_TAMAING_PRODUC"."'.str_replace('"','""',$table).'" WHERE 1=0');return true;}catch(Throwable $e){return false;}
+}
+function pa_read_long(PDO $pdo,string $table,string $column,int $docentry,int $length): string {
+    $allowed=['@TAMA_ORDTRABAJO'=>['U_PlanAccion'],'@TAMA_OTPLANACC'=>['U_PlanAccion','U_TrabajoRealizado','U_Observacion']];
+    if(!isset($allowed[$table])||!in_array($column,$allowed[$table],true)||$length<=0)return '';
+    $length=min($length,30000);$chunk=25;$parts=(int)ceil($length/$chunk);$value='';
+    for($offset=0;$offset<$parts;$offset+=100){$selects=[];$end=min($offset+100,$parts);for($i=$offset;$i<$end;$i++){$start=$i*$chunk+1;$selects[]='SELECT '.$i.' AS "SEQ", CAST(BINTOHEX(CAST(SUBSTRING("'.$column.'",'.$start.','.$chunk.') AS VARBINARY(200))) AS VARCHAR(250)) AS "HEX" FROM "SBO_TAMAING_PRODUC"."'.$table.'" WHERE "DocEntry"='.$docentry;}$stmt=$pdo->query(implode(' UNION ALL ',$selects).' ORDER BY "SEQ"');while($part=$stmt->fetch(PDO::FETCH_ASSOC)){$hex=preg_replace('/[^0-9A-Fa-f]/','',(string)($part['HEX']??''));if($hex==='')continue;if(strlen($hex)%2)$hex=substr($hex,0,-1);$decoded=hex2bin($hex);if($decoded!==false)$value.=$decoded;}}
+    return $value;
+}
+function pa_config(PDO $pdo): array {
+    return ['campo_plan'=>pa_has_column($pdo,'@TAMA_ORDTRABAJO','U_PlanAccion'),'tabla_plan'=>pa_has_table($pdo,'@TAMA_OTPLANACC')];
+}
+function pa_source(PDO $pdo,int $docentry): ?array {
+    $stmt=$pdo->prepare('SELECT T0."DocEntry",T0."DocNum",T0."Status",T0."U_ItemCode",COALESCE(E."U_ItemNameEq",T0."U_ItemCode") AS "ItemName",T0."U_TipoMant",T0."U_Tecnico",T0."U_DetalleSVT",T0."U_FechaInicio",T0."U_FechaFin",T0."U_Hora_Ini",T0."U_Hora_Fin",T0."U_TituFor",LENGTH(T0."U_PlanAccion") AS "PlanLen" FROM "SBO_TAMAING_PRODUC"."@TAMA_ORDTRABAJO" T0 LEFT JOIN "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM" E ON T0."U_ItemCode"=E."Name" WHERE T0."DocEntry"=?');
+    $stmt->execute([$docentry]);$row=$stmt->fetch(PDO::FETCH_ASSOC);if(!$row)return null;
+    $row['U_PlanAccion']=pa_read_long($pdo,'@TAMA_ORDTRABAJO','U_PlanAccion',$docentry,(int)($row['PlanLen']??0));unset($row['PlanLen']);return $row;
+}
+
+if(!$session->isUserLoggedIn(false))pa_out(['error'=>'No autorizado.'],401);
+if(!tiene_permiso('mantenimientos','ver'))pa_out(['error'=>'Sin permiso.'],403);
+$pdo=null;$method=strtoupper($_SERVER['REQUEST_METHOD']??'GET');$action=pa_v($_GET['action']??'');
+
+try{
+    $pdo=getHanaPdo();
+    $config=pa_config($pdo);
+    if($action==='config')pa_out(['success'=>true,'config'=>$config]);
+    if(!$config['campo_plan'])pa_out(['error'=>'Falta crear U_PlanAccion en @TAMA_ORDTRABAJO.','config'=>$config],503);
+
+    if($method==='GET'&&$action==='source'){
+        $docentry=(int)($_GET['docentry']??0);$row=$docentry>0?pa_source($pdo,$docentry):null;
+        if(!$row)pa_out(['error'=>'OT origen no encontrada.'],404);pa_out(['success'=>true,'row'=>$row,'plan_accion'=>$row['U_PlanAccion']??'','config'=>$config]);
+    }
+    if(!$config['tabla_plan'])pa_out(['error'=>'Falta crear la tabla @TAMA_OTPLANACC en SAP.','config'=>$config],503);
+
+    if($method==='GET'&&$action==='pending'){
+        $sql='SELECT T0."DocEntry",T0."DocNum",T0."Status",T0."U_ItemCode",COALESCE(E."U_ItemNameEq",T0."U_ItemCode") AS "ItemName",T0."U_TipoMant",T0."U_Tecnico",T0."U_FechaInicio",T0."U_TituFor",LENGTH(T0."U_PlanAccion") AS "PlanLen" FROM "SBO_TAMAING_PRODUC"."@TAMA_ORDTRABAJO" T0 LEFT JOIN "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM" E ON T0."U_ItemCode"=E."Name" WHERE LENGTH(T0."U_PlanAccion")>0 AND COALESCE(T0."Canceled",\'N\')<>\'Y\' AND NOT EXISTS(SELECT 1 FROM "SBO_TAMAING_PRODUC"."@TAMA_OTPLANACC" P WHERE P."U_OTOrigenDE"=T0."DocEntry" AND COALESCE(P."Canceled",\'N\')<>\'Y\') ORDER BY T0."DocEntry" DESC';
+        $rows=$pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);foreach($rows as &$row){$row['U_PlanAccion']=pa_read_long($pdo,'@TAMA_ORDTRABAJO','U_PlanAccion',(int)$row['DocEntry'],(int)$row['PlanLen']);unset($row['PlanLen']);}unset($row);pa_out(['success'=>true,'rows'=>$rows,'config'=>$config]);
+    }
+    if($method==='GET'&&$action==='list'){
+        $rows=$pdo->query('SELECT P."DocEntry",P."DocNum",P."Status",P."Canceled",P."U_OTOrigenDE",P."U_OTOrigenDN",P."U_ItemCode",COALESCE(E."U_ItemNameEq",P."U_ItemCode") AS "ItemName",P."U_TipoMant",P."U_Tecnico",COALESCE(T."Name",P."U_Tecnico") AS "TecnicoName",P."U_FechaInicio",P."U_FechaFin",P."U_TituFor",P."U_EstadoPlan",P."CreateDate",P."UpdateDate" FROM "SBO_TAMAING_PRODUC"."@TAMA_OTPLANACC" P LEFT JOIN "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM" E ON P."U_ItemCode"=E."Name" LEFT JOIN "SBO_TAMAING_PRODUC"."@TAMA_TECNICOS" T ON P."U_Tecnico"=T."Code" ORDER BY P."DocEntry" DESC')->fetchAll(PDO::FETCH_ASSOC);pa_out(['success'=>true,'rows'=>$rows,'config'=>$config]);
+    }
+    if($method==='GET'&&$action==='get'){
+        $id=(int)($_GET['docentry']??0);$stmt=$pdo->prepare('SELECT P.*,LENGTH(P."U_PlanAccion") AS "PlanLen",LENGTH(P."U_TrabajoRealizado") AS "TrabajoLen",LENGTH(P."U_Observacion") AS "ObsLen" FROM "SBO_TAMAING_PRODUC"."@TAMA_OTPLANACC" P WHERE P."DocEntry"=?');$stmt->execute([$id]);$row=$stmt->fetch(PDO::FETCH_ASSOC);if(!$row)pa_out(['error'=>'OT de Plan de Acción no encontrada.'],404);$row['U_PlanAccion']=pa_read_long($pdo,'@TAMA_OTPLANACC','U_PlanAccion',$id,(int)$row['PlanLen']);$row['U_TrabajoRealizado']=pa_read_long($pdo,'@TAMA_OTPLANACC','U_TrabajoRealizado',$id,(int)$row['TrabajoLen']);$row['U_Observacion']=pa_read_long($pdo,'@TAMA_OTPLANACC','U_Observacion',$id,(int)$row['ObsLen']);unset($row['PlanLen'],$row['TrabajoLen'],$row['ObsLen']);pa_out(['success'=>true,'row'=>$row,'config'=>$config]);
+    }
+    if($method!=='POST')pa_out(['error'=>'Operación no encontrada.'],404);
+    if(!tiene_permiso('mantenimientos','editar')&&!tiene_permiso('mantenimientos','crear'))pa_out(['error'=>'Sin permiso para modificar.'],403);
+    $input=json_decode((string)file_get_contents('php://input'),true)?:[];$postAction=pa_v($input['action']??$action);
+
+    if($postAction==='save_source'){
+        $docentry=(int)($input['docentry']??0);$text=pa_v($input['plan_accion']??'');if($docentry<=0)pa_out(['error'=>'DocEntry de origen inválido.'],400);if(mb_strlen($text)>30000)pa_out(['error'=>'El plan de acción supera 30000 caracteres.'],400);
+        $stmt=$pdo->prepare('UPDATE "SBO_TAMAING_PRODUC"."@TAMA_ORDTRABAJO" SET "U_PlanAccion"=?,"UpdateDate"=?,"UpdateTime"=? WHERE "DocEntry"=?');$stmt->execute([pa_nullable($text),date('Y-m-d'),(int)date('Hi'),$docentry]);pa_out(['success'=>true]);
+    }
+    if($postAction!=='save_order')pa_out(['error'=>'Operación no válida.'],400);
+    $id=(int)($input['docentry']??0);$origin=(int)($input['origen_docentry']??0);if($origin<=0)pa_out(['error'=>'Seleccione una OT origen.'],400);
+    $source=pa_source($pdo,$origin);if(!$source||pa_v($source['U_PlanAccion']??'')==='')pa_out(['error'=>'La OT origen no tiene un plan de acción registrado.'],400);
+    $item=mb_substr(pa_v($input['itemcode']??''),0,50);$type=mb_substr(pa_v($input['tipomant']??''),0,30);$tech=mb_substr(pa_v($input['tecnico']??''),0,30);$svt=mb_substr(pa_v($input['detalle_svt']??''),0,150);$start=pa_date(pa_v($input['fechainicio']??''),true);$end=pa_date(pa_v($input['fechafin']??''));$hStart=pa_time(pa_v($input['horainicio']??''));$hEnd=pa_time(pa_v($input['horafin']??''));$title=mb_substr(pa_v($input['titulo']??''),0,150);$work=pa_v($input['trabajo']??'');$obs=pa_v($input['observacion']??'');$status=strtoupper(pa_v($input['estado']??'ABIERTO'));
+    if($item===''||$type===''||$start===null||$work==='')pa_out(['error'=>'Complete equipo, tipo, fecha de inicio y trabajo a realizar.'],400);if(!in_array($status,['ABIERTO','EN PROCESO','CERRADO','ANULADO'],true))pa_out(['error'=>'Estado no válido.'],400);if($end&&$end<$start)pa_out(['error'=>'La fecha fin no puede ser anterior al inicio.'],400);
+    $nowDate=date('Y-m-d');$nowTime=(int)date('Hi');$user=current_user();$creator=mb_substr(pa_v($user['name']??'SISTEMA'),0,8);$sapStatus=in_array($status,['CERRADO','ANULADO'],true)?'C':'O';$canceled=$status==='ANULADO'?'Y':'N';
+    $pdo->beginTransaction();
+    if($id>0){$stmt=$pdo->prepare('UPDATE "SBO_TAMAING_PRODUC"."@TAMA_OTPLANACC" SET "Status"=?,"Canceled"=?,"UpdateDate"=?,"UpdateTime"=?,"U_ItemCode"=?,"U_TipoMant"=?,"U_Tecnico"=?,"U_DetalleSVT"=?,"U_FechaInicio"=?,"U_FechaFin"=?,"U_Hora_Ini"=?,"U_Hora_Fin"=?,"U_TituFor"=?,"U_TrabajoRealizado"=?,"U_Observacion"=?,"U_EstadoPlan"=? WHERE "DocEntry"=?');$stmt->execute([$sapStatus,$canceled,$nowDate,$nowTime,$item,pa_nullable($type),pa_nullable($tech),pa_nullable($svt),$start,$end,$hStart,$hEnd,pa_nullable($title),$work,pa_nullable($obs),$status,$id]);$pdo->commit();pa_out(['success'=>true,'docentry'=>$id,'action'=>'updated']);}
+    $exists=$pdo->prepare('SELECT TOP 1 "DocEntry" FROM "SBO_TAMAING_PRODUC"."@TAMA_OTPLANACC" WHERE "U_OTOrigenDE"=? AND COALESCE("Canceled",\'N\')<>\'Y\'');$exists->execute([$origin]);if($exists->fetch()){ $pdo->rollBack();pa_out(['error'=>'Esta OT ya tiene una orden de Plan de Acción generada.'],409); }
+    $max=$pdo->query('SELECT COALESCE(MAX("DocEntry"),0)+1 AS "DE",COALESCE(MAX("DocNum"),0)+1 AS "DN" FROM "SBO_TAMAING_PRODUC"."@TAMA_OTPLANACC"')->fetch(PDO::FETCH_ASSOC);$de=(int)$max['DE'];$dn=(int)$max['DN'];
+    $stmt=$pdo->prepare('INSERT INTO "SBO_TAMAING_PRODUC"."@TAMA_OTPLANACC" ("DocEntry","DocNum","Period","Instance","Series","Handwrtten","Canceled","Object","LogInst","UserSign","Transfered","Status","CreateDate","CreateTime","UpdateDate","UpdateTime","DataSource","RequestStatus","Creator","Remark","U_OTOrigenDE","U_OTOrigenDN","U_PlanAccion","U_ItemCode","U_TipoMant","U_Tecnico","U_DetalleSVT","U_FechaInicio","U_FechaFin","U_Hora_Ini","U_Hora_Fin","U_TituFor","U_TrabajoRealizado","U_Observacion","U_EstadoPlan") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    $stmt->execute([$de,$dn,date('Y'),1,1,'N',$canceled,'TAMA_OTPLANACC',1,1,'N',$sapStatus,$nowDate,$nowTime,$nowDate,$nowTime,'I','A',$creator,$work,$origin,(int)$source['DocNum'],$source['U_PlanAccion'],$item,pa_nullable($type),pa_nullable($tech),pa_nullable($svt),$start,$end,$hStart,$hEnd,pa_nullable($title),$work,pa_nullable($obs),$status]);$pdo->commit();pa_out(['success'=>true,'docentry'=>$de,'docnum'=>$dn,'action'=>'inserted']);
+}catch(Throwable $e){if($pdo instanceof PDO&&$pdo->inTransaction())$pdo->rollBack();pa_out(['error'=>$e->getMessage()],500);}

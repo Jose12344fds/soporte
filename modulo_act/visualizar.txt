@@ -1,0 +1,383 @@
+Implementar módulo Gestión de Capacidad TI.
+
+El módulo debe integrarse con la tabla existente MAQUINA (hardware). 
+Debe permitir registrar servidores físicos, hipervisores, máquinas virtuales, software instalado y servicios TI relacionados.
+
+La capacidad no debe almacenarse como un valor fijo, sino mediante:
+1. Configuración inicial de recursos asignados a cada VM (CPU, RAM, disco).
+2. Registro histórico de mediciones periódicas (CPU, RAM, disco, red).
+3. Cálculo automático del porcentaje de uso.
+4. Generación de alertas según umbrales configurables.
+
+La relación principal es:
+Servidor físico → Máquina Virtual → Software instalado → Servicio TI → Historial de capacidad.
+
+El objetivo es conocer la utilización de recursos, detectar saturación y proyectar necesidades futuras de crecimiento.
+
+
+
+
+
+
+
+
+
+
+
+
+TEORIA LO QUE SE TIENE QUE HACER. 
+
+
+
+
+
+
+MODELO DE TABLAS ACTUALIZADO
+1. TABLA: MAQUINA (YA EXISTENTE) ESTA EN EL MODULO :\\192.168.4.8\soporte\modules\activos. 
+
+Representa el hardware físico.
+
+Ejemplo:
+
+Servidores físicos
+PCs
+Switches
+Equipos de red
+MAQUINA
+
+IdMaquina PK
+TipoActivo
+CategoriaEquipo
+Host
+Marca
+Modelo
+Procesador
+MemoriaRAM
+TipoDisco
+TamañoDisco
+IP
+Ubicacion
+EstadoMaquina
+Criticidad
+
+Ejemplo:
+
+Id	Host	RAM
+1	SRV-FIS-01	128 GB
+2. TABLA: HIPERVISOR
+
+Controla la plataforma de virtualización.
+
+Ejemplo:
+
+VMware ESXi
+Hyper-V
+Proxmox
+HIPERVISOR
+
+IdHipervisor PK
+IdMaquina FK
+TipoHipervisor
+Fabricante
+Version
+Licencia
+Estado
+
+Relación:
+
+MAQUINA 1 -------- 1 HIPERVISOR
+3. TABLA: MAQUINA_VIRTUAL
+
+Representa las VM creadas dentro del servidor físico.
+
+MAQUINA_VIRTUAL
+
+IdVM PK
+IdMaquina FK
+
+NombreVM
+
+SistemaOperativo
+
+CPUAsignada
+
+RAMAsignada
+
+DiscoAsignado
+
+IP_VM
+
+EstadoVM
+
+FechaCreacion
+
+Observacion
+
+Ejemplo:
+
+VM	Servidor	RAM
+VM-BD01	SRV-FIS-01	64 GB
+VM-ERP01	SRV-FIS-01	32 GB
+
+Relación:
+
+SERVIDOR FÍSICO
+        |
+        |
+        N
+MAQUINA VIRTUAL
+4. TABLA: SOFTWARE
+
+Catálogo general de software.
+
+No indica dónde está instalado.
+
+SOFTWARE
+
+IdSoftware PK
+
+NombreSoftware
+
+TipoSoftware
+(SO, BD, Aplicación, Antivirus)
+
+Fabricante
+
+Version
+
+TipoLicencia
+
+NumeroLicencia
+
+FechaInicioLicencia
+
+FechaFinLicencia
+
+Criticidad
+
+EstadoSoftware
+
+Observacion
+
+Ejemplo:
+
+Software	Tipo
+Windows Server 2022	Sistema Operativo
+SQL Server 2022	Base Datos
+ERP	Aplicación
+5. TABLA: VM_SOFTWARE
+
+Relaciona una VM con el software instalado.
+
+Porque una VM puede tener varios softwares.
+
+VM_SOFTWARE
+
+IdVMSoftware PK
+
+IdVM FK
+
+IdSoftware FK
+
+FechaInstalacion
+
+VersionInstalada
+
+EstadoInstalacion
+
+Observacion
+
+Ejemplo:
+
+VM	Software
+VM-BD01	Windows Server
+VM-BD01	SQL Server
+VM-ERP01	ERP
+
+Relación:
+
+MAQUINA_VIRTUAL
+       |
+       |
+       N
+VM_SOFTWARE
+       |
+       |
+       N
+SOFTWARE
+6. TABLA: SERVICIO_TI
+
+Catálogo de servicios tecnológicos.
+
+Ejemplo:
+
+ERP
+Correo
+Sistema financiero
+Base de datos
+SERVICIO_TI
+
+IdServicio PK
+
+NombreServicio
+
+Descripcion
+
+Categoria
+
+Criticidad
+
+Responsable
+
+SLA
+
+EstadoServicio
+
+Ejemplo:
+
+Servicio	Criticidad
+ERP Financiero	Alta
+Correo	Alta
+7. TABLA: SERVICIO_VM
+
+Relaciona un servicio con las máquinas virtuales que lo soportan.
+
+SERVICIO_VM
+
+IdServicioVM PK
+
+IdServicio FK
+
+IdVM FK
+
+RolVM
+
+Ejemplo:
+
+Servicio	VM	Rol
+ERP	VM-ERP01	Aplicación
+ERP	VM-BD01	Base Datos
+8. TABLA: CONFIGURACION_CAPACIDAD_VM
+
+Guarda la capacidad asignada.
+
+Es decir, los recursos disponibles.
+
+CONFIGURACION_CAPACIDAD_VM
+
+IdConfiguracion PK
+
+IdVM FK
+
+CPUAsignada
+
+RAMAsignada
+
+DiscoAsignado
+
+FechaRegistro
+
+Responsable
+
+Observacion
+
+Ejemplo:
+
+VM	RAM asignada
+VM-BD01	64 GB
+9. TABLA: HISTORIAL_CAPACIDAD
+
+Esta es la tabla más importante.
+
+Aquí se registra la evaluación semanal/quincenal.
+
+HISTORIAL_CAPACIDAD
+
+IdHistorial PK
+
+IdVM FK
+
+FechaEvaluacion
+
+Recurso
+(CPU,RAM,DISCO,RED)
+
+CapacidadTotal
+
+ConsumoActual
+
+PorcentajeUso
+
+UmbralAlerta
+
+Estado
+
+RegistradoPor
+
+Observacion
+
+Ejemplo:
+
+Fecha	VM	Recurso	Uso
+01/09	VM-BD01	RAM	75%
+08/09	VM-BD01	RAM	85%
+15/09	VM-BD01	RAM	92%
+10. TABLA: ALERTA_CAPACIDAD
+
+Para generar avisos.
+
+Ejemplo:
+
+RAM supera 90%
+Disco supera 85%
+ALERTA_CAPACIDAD
+
+IdAlerta PK
+
+IdVM FK
+
+FechaAlerta
+
+Recurso
+
+PorcentajeDetectado
+
+NivelAlerta
+(Verde, Amarillo, Rojo)
+
+Descripcion
+
+EstadoAlerta
+RELACIÓN FINAL DEL MODELO
+                 SERVICIO_TI
+                     |
+                     |
+                SERVICIO_VM
+                     |
+                     |
+              MAQUINA_VIRTUAL
+                     |
+        -----------------------------
+        |                           |
+   VM_SOFTWARE              CONFIGURACION_CAPACIDAD
+        |                           |
+        |                           |
+     SOFTWARE              HISTORIAL_CAPACIDAD
+                                     |
+                                     |
+                              ALERTA_CAPACIDAD
+
+
+MAQUINA (Servidor físico)
+          |
+          |
+      HIPERVISOR
+          |
+          |
+   MAQUINA_VIRTUAL
+
+
+
+
+
+

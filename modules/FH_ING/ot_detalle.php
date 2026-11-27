@@ -1,0 +1,1239 @@
+﻿<?php
+$page_title = 'Registro de OTs — FH ING';
+require_once dirname(dirname(__DIR__)) . '/includes/load.php';
+require_permiso('ots_ingeniera', 'ver');
+$otUsuario = current_user();
+$otHoy = (new DateTimeImmutable('now', new DateTimeZone('America/Bogota')))->format('Y-m-d');
+include_once dirname(dirname(__DIR__)) . '/layouts/header.php';
+?>
+<style>
+/* ── Layout base ──────────────────────────────────────────────────── */
+.fp-page-wrap { padding: 18px 16px; width: 100%; min-width: 0; }
+.fp-page-wrap .content-header { padding: 0 0 14px; }
+.fp-page-wrap .content { padding: 0; }
+.fp-page-wrap .container-fluid { padding-left: 0; padding-right: 0; }
+.fp-page-wrap .form-control[readonly], .fp-page-wrap .form-control:disabled { background: #f1f5f9; color: #475569; }
+.fp-field small { display: block; margin-top: 5px; color: #64748b; font-size: .74rem; }
+@media (max-width: 576px) {
+ .fp-page-wrap { padding: 14px 10px; }
+ .fp-form-row .fp-field { flex: 1 1 100% !important; min-width: 0 !important; }
+ .fp-card-body { padding: 16px 12px; }
+}
+
+/* ── Form / Table cards ───────────────────────────────────────────── */
+.fp-act-card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    margin-bottom: 18px;
+    overflow: hidden;
+}
+.fp-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #1e3a5f, #2563eb);
+    color: #fff;
+    font-weight: 700;
+    font-size: .88rem;
+    gap: 10px;
+}
+.fp-card-header i { opacity: .85; }
+.fp-card-body { padding: 18px 20px; }
+
+/* ── Badge count ──────────────────────────────────────────────────── */
+.badge-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    background: rgba(255,255,255,.22);
+    border: 1.5px solid rgba(255,255,255,.4);
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+    border-radius: 12px;
+}
+
+/* ── Form fields ──────────────────────────────────────────────────── */
+.fp-form-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.fp-form-row .fp-field { flex: 1; min-width: 180px; }
+.fp-form-row .fp-field label {
+    font-size: .78rem; font-weight: 600; color: #374151; margin-bottom: 4px; display: block;
+}
+.fp-form-row .fp-field .form-control {
+    font-size: .85rem; border-radius: 7px; border: 1.5px solid #d1d5db;
+}
+.fp-form-row .fp-field .form-control:focus {
+    border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+}
+.fp-btn-guardar {
+    background: linear-gradient(135deg, #1e3a5f, #2563eb);
+    color: #fff; border: none; border-radius: 7px;
+    padding: 8px 20px; font-size: .84rem; font-weight: 600;
+    cursor: pointer; transition: opacity .15s;
+}
+.fp-btn-guardar:hover { opacity: .88; }
+.fp-btn-guardar:disabled { opacity: .6; cursor: not-allowed; }
+
+/* ── Filter bar ───────────────────────────────────────────────────── */
+.fp-filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.fp-filter-bar input.form-control { max-width: 320px; border-radius: 7px; border: 1.5px solid #d1d5db; font-size: .84rem; }
+
+/* ── OT status pipeline (table row) ──────────────────────────────── */
+.ot-status-pipe {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.ot-status-step {
+    font-size: .65rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: #e2e8f0;
+    color: #64748b;
+    border: 1.5px solid #cbd5e1;
+    white-space: nowrap;
+    transition: background .15s;
+}
+.ot-status-step.done {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+.ot-status-step.active {
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 2px 6px rgba(0,0,0,.18);
+}
+
+/* ── Ver button ───────────────────────────────────────────────────── */
+.btn-preview-ot {
+    background: linear-gradient(135deg, #0f766e, #0d9488);
+    color: #fff; border: none; border-radius: 6px;
+    padding: 4px 12px; font-size: .76rem; font-weight: 600;
+    cursor: pointer; transition: opacity .15s; white-space: nowrap;
+}
+.btn-preview-ot:hover { opacity: .85; }
+.btn-preview-ot i { margin-right: 4px; }
+
+/* ── OT table ─────────────────────────────────────────────────────── */
+.fp-table { width: 100%; font-size: .82rem; border-collapse: collapse; }
+.fp-table th {
+    background: #f1f5f9; color: #374151; font-weight: 700;
+    padding: 8px 12px; text-align: left; border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+}
+.fp-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.fp-table tbody tr:hover { background: #f8fafc; }
+
+/* ── Finalizados panel ────────────────────────────────────────────── */
+.fin-toggle-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; background: none; border: none; padding: 12px 20px;
+    cursor: pointer; font-size: .86rem; font-weight: 600; color: #fff;
+    text-align: left;
+}
+.fin-toggle-btn:hover { opacity: .85; }
+
+/* ── Report Overlay ───────────────────────────────────────────────── */
+#reportOverlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,.55);
+    backdrop-filter: blur(3px);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.rpt-panel {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 24px 80px rgba(0,0,0,.28);
+    width: 100%; max-width: 980px;
+    max-height: calc(100vh - 32px);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+.rpt-titlebar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #0f172a, #1e3a5f);
+    flex-shrink: 0;
+}
+.rpt-brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.rpt-brand-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: rgba(255,255,255,.12);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 1rem; flex-shrink: 0;
+}
+.rpt-brand-text { display: flex; flex-direction: column; min-width: 0; }
+.rpt-brand-ot   { font-weight: 800; font-size: .92rem; color: #fff; }
+.rpt-brand-proy { font-size: .74rem; color: rgba(255,255,255,.65); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rpt-tabs { display: flex; gap: 6px; flex-shrink: 0; }
+.rpt-tab-btn {
+    padding: 6px 14px; border-radius: 8px; border: none;
+    background: rgba(255,255,255,.1); color: rgba(255,255,255,.7);
+    font-size: .77rem; font-weight: 600; cursor: pointer; transition: all .15s;
+}
+.rpt-tab-btn.active,
+.rpt-tab-btn:hover { background: rgba(255,255,255,.22); color: #fff; }
+.rpt-tab-btn i { margin-right: 5px; }
+.rpt-titlebar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.rpt-estado-chip {
+    padding: 4px 14px; border-radius: 20px;
+    font-size: .72rem; font-weight: 700;
+    border: 1.5px solid rgba(255,255,255,.28);
+    background: rgba(255,255,255,.1); color: #fff; white-space: nowrap;
+}
+.rpt-close-btn {
+    width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,.12); color: rgba(255,255,255,.8);
+    font-size: .9rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+}
+.rpt-close-btn:hover { background: rgba(220,38,38,.5); color: #fff; }
+
+.rpt-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.rpt-tab-pane { display: none; flex: 1; overflow-y: auto; padding: 20px; }
+.rpt-tab-pane.active { display: block; }
+
+/* Pipeline */
+.rpt-pipeline { margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
+.rpt-pipeline-inner {
+    display: flex; align-items: flex-start; gap: 0;
+    min-width: max-content;
+}
+.rpt-pipe-step {
+    display: flex; flex-direction: column; align-items: center;
+    position: relative; flex: 1; min-width: 80px;
+}
+.rpt-pipe-line {
+    position: absolute; top: 18px; right: 50%; left: -50%;
+    height: 3px; background: #e2e8f0; z-index: 0;
+    transition: background .3s;
+}
+.rpt-pipe-node {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #c9d4e0; border: 3px solid #c9d4e0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: .85rem; position: relative; z-index: 1;
+    transition: all .3s;
+}
+.rpt-pipe-step.done   .rpt-pipe-node { box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.rpt-pipe-step.active .rpt-pipe-node { box-shadow: 0 0 0 4px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.18); transform: scale(1.1); }
+.rpt-pipe-label { font-size: .7rem; font-weight: 600; color: #64748b; margin-top: 6px; text-align: center; white-space: nowrap; }
+.rpt-pipe-step.active .rpt-pipe-label { color: #1e293b; font-weight: 700; }
+
+/* KPI Cards */
+.rpt-kpi-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.rpt-kpi-card {
+    flex: 1; min-width: 160px; max-width: 260px;
+    border-radius: 12px; padding: 16px 16px 14px;
+    position: relative; overflow: hidden;
+    background: #f8fafc; border: 1.5px solid #e2e8f0;
+}
+.rpt-kpi-m1 { background: #eff6ff; border-color: #bfdbfe; }
+.rpt-kpi-m2 { background: #fffbeb; border-color: #fde68a; }
+.rpt-kpi-m3 { background: #f5f3ff; border-color: #ddd6fe; }
+.rpt-kpi-fin { background: #f0fdf4; border-color: #bbf7d0; }
+.rpt-kpi-tag { font-size: .68rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.rpt-kpi-val { font-size: 2rem; font-weight: 800; line-height: 1; }
+.rpt-kpi-unit { font-size: .72rem; color: #6b7280; margin-top: 2px; }
+.rpt-kpi-meta { font-size: .7rem; color: #94a3b8; margin-top: 8px; }
+.rpt-kpi-icon {
+    position: absolute; right: 12px; bottom: 10px;
+    font-size: 2.4rem; opacity: .07; pointer-events: none;
+}
+
+/* Summary footer */
+.rpt-summary-footer {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    padding: 12px 16px;
+    background: #f8fafc; border-radius: 8px;
+    border: 1px solid #e2e8f0; font-size: .78rem; color: #374151;
+}
+.rpt-summary-footer span { display: flex; align-items: center; gap: 5px; }
+
+/* ── Gantt ────────────────────────────────────────────────────────── */
+.rpt-gantt-wrapper { overflow: auto; max-height: calc(100vh - 280px); }
+.rpt-gantt-toolbar {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    padding: 10px 0 12px; gap: 10px; margin-bottom: 8px;
+}
+.rptg-legend-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.rptg-legend { display: flex; align-items: center; gap: 5px; font-size: .73rem; color: #374151; font-weight: 600; }
+.rptg-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+.rptg-table { border-collapse: collapse; font-size: .75rem; table-layout: fixed; min-width: 100%; }
+.rptg-th {
+    background: #f1f5f9; color: #374151; font-weight: 700;
+    padding: 6px 8px; text-align: center;
+    border: 1px solid #e2e8f0; white-space: nowrap;
+    position: sticky; top: 0; z-index: 3;
+}
+.rptg-td { padding: 4px 6px; border: 1px solid #f1f5f9; white-space: nowrap; vertical-align: middle; }
+.rptg-td.sticky { position: sticky; background: #fff; z-index: 2; }
+.rptg-label { max-width: 200px; overflow: hidden; text-overflow: ellipsis; font-size: .72rem; }
+.rptg-dur { text-align: center; color: #64748b; font-size: .7rem; }
+.rptg-bar-td { padding: 0 !important; border: 1px solid #f1f5f9; }
+.rptg-bar-cell { position: relative; height: 28px; }
+.rptg-bar {
+    position: absolute; top: 5px; height: 18px;
+    border-radius: 4px; display: flex; align-items: center;
+    overflow: hidden; min-width: 4px;
+}
+.rptg-bar-txt { color: #fff; font-size: .66rem; font-weight: 700; padding: 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rptg-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; z-index: 1; opacity: .7; }
+.rptg-mod-header td { font-size: .72rem; }
+.rptg-row:hover .rptg-td { background: #f8fafc; }
+
+/* ── Project selector modal ───────────────────────────────────────── */
+.modal-filter-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 20px; background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+.modal-filter-bar i { color: #6b7280; }
+.modal-filter-bar input {
+    flex: 1; border: 1.5px solid #d1d5db; border-radius: 7px;
+    padding: 6px 10px; font-size: .83rem; outline: none;
+}
+.modal-filter-bar input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.btn-clear {
+    background: none; border: none; cursor: pointer; color: #9ca3af; padding: 4px 6px;
+}
+.btn-clear:hover { color: #ef4444; }
+.modal-stats {
+    padding: 6px 20px 2px; font-size: .76rem; color: #6b7280;
+    display: flex; align-items: center; gap: 5px;
+}
+.pill {
+    display: inline-block; padding: 1px 8px; border-radius: 10px;
+    background: #2563eb; color: #fff; font-weight: 700; font-size: .72rem;
+}
+</style>
+
+<div class="fp-page-wrap">
+  <div class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1 class="m-0" style="font-size:1.2rem; font-weight:700;">
+            <i class="fas fa-clipboard-list" style="color:#2563eb; margin-right:8px;"></i>
+            Registro de Órdenes de Trabajo
+          </h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="../../home.php">Inicio</a></li>
+            <li class="breadcrumb-item active">FH ING — Registro OT</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="content">
+    <div class="container-fluid">
+
+      <!-- ── Formulario de registro ─────────────────────────────── -->
+      <div class="fp-act-card">
+        <div class="fp-card-header">
+          <span><i class="fas fa-plus-circle"></i> Registrar Orden de Trabajo</span>
+        </div>
+        <div class="fp-card-body">
+          <div id="formAlert" style="display:none;"></div>
+          <div class="fp-form-row">
+            <div class="fp-field" style="flex:0 0 auto; min-width:220px;">
+              <label for="inputOT"><i class="fas fa-barcode" style="margin-right:4px;"></i>Código OT <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input type="text" id="inputOT" class="form-control" placeholder="Ej: 4135 ó OTC-004135"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();buscarOTDirecta();}">
+                <div class="input-group-append">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="buscarOTDirecta()" title="Buscar OT directo">
+                    <i class="fas fa-search"></i>
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-toggle="modal" data-target="#modalProyectos" title="Ver lista completa">
+                    <i class="fas fa-list"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="fp-field" style="flex:2; min-width:260px;">
+              <label for="inputProy"><i class="fas fa-project-diagram" style="margin-right:4px;"></i>Proyecto</label>
+              <input type="text" id="inputProy" class="form-control" placeholder="Se completa al seleccionar OT" readonly>
+            </div>
+          </div>
+          <div class="fp-form-row">
+            <div class="fp-field">
+              <label for="elaboradoPor"><i class="fas fa-user-edit" style="margin-right:4px;"></i>Elaborado por</label>
+              <input type="text" id="elaboradoPor" class="form-control" value="<?= htmlspecialchars($otUsuario['name'] ?? $otUsuario['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>" readonly>
+            </div>
+            <div class="fp-field">
+              <label for="revisadoPor"><i class="fas fa-user-check" style="margin-right:4px;"></i>Revisado por</label>
+              <input type="text" id="revisadoPor" class="form-control" placeholder="Pendiente de revisión" disabled>
+            </div>
+            <div class="fp-field">
+              <label for="aprobadoPor"><i class="fas fa-user-shield" style="margin-right:4px;"></i>Aprobado por</label>
+              <input type="text" id="aprobadoPor" class="form-control" placeholder="Pendiente de aprobación" disabled>
+            </div>
+            <div class="fp-field" style="flex:0 0 auto; min-width:160px;">
+              <label for="actualizadoAl"><i class="fas fa-calendar-alt" style="margin-right:4px;"></i>Actualizado al</label>
+              <input type="date" id="actualizadoAl" class="form-control" value="<?= $otHoy ?>" readonly>
+              <small>Se actualiza al guardar.</small>
+            </div>
+          </div>
+          <div class="fp-form-row">
+            <div class="fp-field" style="max-width:280px;">
+              <label for="fechaInicio">Fecha de inicio del proyecto</label>
+              <input type="date" id="fechaInicio" class="form-control" value="<?= $otHoy ?>" required>
+              <small>Por defecto hoy. Puede ajustarse antes del primer registro; después queda fija.</small>
+            </div>
+          </div>
+          <div style="margin-top:6px;">
+            <button class="fp-btn-guardar" onclick="guardar(this)">
+              <i class="fas fa-save"></i> Guardar Registro
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tabla de OTs registradas ───────────────────────────── -->
+      <div class="fp-act-card">
+        <div class="fp-card-header">
+          <span><i class="fas fa-list"></i> Órdenes de Trabajo Registradas</span>
+          <span class="badge-count" id="badgeOTs">—</span>
+        </div>
+        <div class="fp-card-body">
+          <div class="fp-filter-bar">
+            <input type="text" id="filterOTs" class="form-control"
+              placeholder="Filtrar por OT, proyecto o responsable…">
+          </div>
+          <div id="tblLoadingState" style="display:none; text-align:center; padding:30px; color:#64748b;">
+            <i class="fas fa-spinner fa-spin" style="font-size:1.4rem; display:block; margin-bottom:8px;"></i>
+            Cargando registros…
+          </div>
+          <div id="tblEmptyState" style="display:none; text-align:center; padding:30px; color:#94a3b8;">
+            <i class="fas fa-inbox" style="font-size:2rem; display:block; margin-bottom:10px; opacity:.4;"></i>
+            No hay OTs registradas aún.
+          </div>
+          <div id="tblWrapper" style="display:none; overflow-x:auto;">
+            <table class="fp-table">
+              <thead>
+                <tr>
+                  <th style="width:40px;">#</th>
+                  <th style="width:140px;">OT</th>
+                  <th>Proyecto</th>
+                  <th style="width:160px;">Elaborado por</th>
+                  <th style="width:130px;">Inicio del proyecto</th><th style="width:130px;">Actualizado al</th>
+                  <th style="width:260px;">Estado</th>
+                  <th style="width:240px; text-align:center;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tblBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="fp-act-card"><div class="fp-card-body" style="display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;">
+        <div><strong>OTs cerradas</strong><div class="text-muted">Consulta los proyectos cerrados, sus reportes, documentos y observaciones.</div></div>
+        <a class="btn btn-success" href="ots_cerradas.php"><i class="fas fa-archive"></i> Ver OTs cerradas</a>
+      </div></div>
+
+    </div><!-- /.container-fluid -->
+  </section>
+</div><!-- /.content-wrapper -->
+
+<!-- ── Report Overlay ────────────────────────────────────────────── -->
+<div id="reportOverlay">
+  <div class="rpt-panel">
+    <div class="rpt-titlebar">
+      <div class="rpt-brand">
+        <div class="rpt-brand-icon"><i class="fas fa-project-diagram"></i></div>
+        <div class="rpt-brand-text">
+          <div class="rpt-brand-ot" id="rptOT">—</div>
+          <div class="rpt-brand-proy" id="rptProy">—</div>
+        </div>
+      </div>
+      <div class="rpt-tabs">
+        <button class="rpt-tab-btn active" data-tab="resumen">
+          <i class="fas fa-chart-pie"></i> Resumen
+        </button>
+        <button class="rpt-tab-btn" data-tab="cronograma">
+          <i class="fas fa-stream"></i> Cronograma
+        </button>
+      </div>
+      <div class="rpt-titlebar-right">
+        <span class="rpt-estado-chip" id="rptEstadoPill">—</span>
+        <button class="rpt-close-btn" onclick="cerrarReporte()" title="Cerrar (Esc)">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+    <div class="rpt-body">
+      <!-- Tab: Resumen -->
+      <div class="rpt-tab-pane active" id="rptTabResumen">
+        <div class="rpt-pipeline" id="rptPipeline"></div>
+        <div class="rpt-kpi-row" id="rptKpiRow"></div>
+        <div class="rpt-summary-footer" id="rptSummaryFooter"></div>
+      </div>
+      <!-- Tab: Cronograma -->
+      <div class="rpt-tab-pane" id="rptTabCronograma">
+        <div class="rpt-gantt-wrapper">
+          <div class="rpt-gantt-toolbar">
+            <span style="font-size:.78rem; font-weight:700; color:#475569;">
+              <i class="fas fa-stream" style="color:#2563eb; margin-right:5px;"></i>
+              Cronograma del Proyecto
+            </span>
+            <div class="rptg-legend-row">
+              <div class="rptg-legend">
+                <div class="rptg-legend-dot" style="background:#2563eb;"></div> M1 Actividades
+              </div>
+              <div class="rptg-legend">
+                <div class="rptg-legend-dot" style="background:#d97706;"></div> M1 Planos
+              </div>
+              <div class="rptg-legend">
+                <div class="rptg-legend-dot" style="background:#7c3aed;"></div> Módulo 2
+              </div>
+              <div class="rptg-legend">
+                <div class="rptg-legend-dot" style="background:#ef4444; opacity:.7;"></div>
+                Hoy
+              </div>
+            </div>
+          </div>
+          <div id="rptGanttBody"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal Selector de Proyectos SAP ──────────────────────────── -->
+<div class="modal fade" id="modalProyectos" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-project-diagram" style="margin-right:6px; color:#2563eb;"></i>
+          Selector de Proyectos SAP
+        </h5>
+        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+      </div>
+      <div class="modal-filter-bar">
+        <i class="fas fa-filter"></i>
+        <input type="text" id="modalSearch" placeholder="Filtrar por código OT o nombre de proyecto…">
+        <button class="btn-clear" id="btnClearFilter" title="Limpiar filtro">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-stats">
+        <i class="fas fa-database"></i>
+        Mostrando <span class="pill" id="modalCount">0</span> proyectos
+      </div>
+      <div class="modal-body" style="padding:0 20px 16px; max-height:420px; overflow-y:auto;">
+        <table class="table table-hover table-sm" id="tblModal">
+          <thead>
+            <tr>
+              <th style="width:130px;">Código OT</th>
+              <th>Proyecto</th>
+              <th style="width:130px;">Peso Ppto (Kg)</th>
+              <th style="width:120px;">Peso Neto (Kg)</th>
+              <th style="width:90px;">HH Fab</th>
+            </tr>
+          </thead>
+          <tbody id="tblModalBody">
+            <tr><td colspan="5" class="text-center py-3 text-muted">
+              <i class="fas fa-spinner fa-spin"></i> Cargando…
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <small class="text-muted mr-auto">
+          <i class="fas fa-hand-pointer"></i> Haz clic en una fila para seleccionar
+        </small>
+        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">
+          <i class="fas fa-times"></i> Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<?php include_once dirname(dirname(__DIR__)) . '/layouts/footer.php'; ?>
+
+<script src="../../assets/js/fh_calendario.js?v=20261027"></script>
+<script src="../../assets/js/fh_resumen_ot.js?v=20261027"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   OT Detalle — FH ING
+   Módulos: Registro, Vista Resumen, Cronograma Gantt
+═══════════════════════════════════════════════════════════════════ */
+var API_PROYECTOS   = '../../api/hhmeta/get_proyectos.php';
+var API_GUARDAR     = '../../api/fh_ing/guardar_ot_detalle.php';
+var API_REGISTROS   = '../../api/fh_ing/get_ot_detalle.php?modulo=5';
+var API_FINALIZADOS = '../../api/fh_ing/get_ot_detalle.php?modulo=4';
+var API_RESUMEN     = '../../api/fh_ing/get_proyecto_resumen.php';
+
+var todosProyectos = [];
+var selectedOT     = '';
+var selectedProy   = '';
+var dtRegistros    = [];
+
+/* ── Colores por módulo ─────────────────────────────────────────── */
+var MOD_COLORS = {
+    m1: ['#1d4ed8','#2563eb','#3b82f6','#60a5fa','#93c5fd'],
+    m2: ['#b45309','#d97706','#f59e0b','#fbbf24','#fcd34d'],
+    m3: ['#6d28d9','#7c3aed','#8b5cf6','#a78bfa','#c4b5fd']
+};
+
+/* ── Estado config ──────────────────────────────────────────────── */
+var ESTADO_CFG = {
+    '-1': { label: 'Sin cronograma', cls: 'secondary', step: 0 },
+     '0': { label: 'Módulo 1',       cls: 'warning',   step: 1 },
+     '1': { label: 'Módulo 1',       cls: 'primary',   step: 1 },
+     '2': { label: 'Módulo 2',       cls: 'info',      step: 2 },
+     '4': { label: 'Pendiente de cierre', cls:'warning', step:3 },
+     '3': { label: 'Cerrado', cls:'success', step:4 }
+};
+
+/* ── Utilidades ─────────────────────────────────────────────────── */
+function esc(v) {
+    if (v == null) return '';
+    return String(v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function fmtFecha(s) {
+    if (!s) return '—';
+    var p = s.split('-');
+    if (p.length !== 3) return s;
+    return p[2] + '/' + p[1] + '/' + p[0];
+}
+function parseDate(s) {
+    if (!s) return null;
+    var p = s.split('-');
+    return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
+}
+function addDays(d, n) { var r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function diffDays(a, b) { return Math.round((b - a) / 86400000); }
+function fmtShort(d) {
+    var M = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    return d.getDate() + ' ' + M[d.getMonth()];
+}
+function fmtDateISO(d) {
+    return d.getFullYear() + '-' +
+           String(d.getMonth() + 1).padStart(2, '0') + '-' +
+           String(d.getDate()).padStart(2, '0');
+}
+function showAlert(id, type, msg) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '<div class="alert alert-' + (type === 'error' ? 'danger' : type) +
+        ' alert-dismissible fade show py-2" role="alert">' + esc(msg) +
+        '<button type="button" class="close" data-dismiss="alert">' +
+        '<span>&times;</span></button></div>';
+    setTimeout(function() {
+        var a = el.querySelector('.alert');
+        if (a && window.$) $(a).alert('close');
+    }, (type === 'danger' || type === 'error') ? 20000 : 4000);
+}
+
+/* ── estadoBadgeHtml ────────────────────────────────────────────── */
+function estadoBadgeHtml(estado) {
+    var e      = String(estado);
+    var cfg    = ESTADO_CFG[e] || ESTADO_CFG['-1'];
+    var activeStep = cfg.step;
+    var steps = [
+        { key: '-1', short: 'Registro'  },
+        { key:  '0', short: 'Módulo 1'  },
+        { key:  '2', short: 'Módulo 2'  },
+        { key: '4', short:'Por cerrar' },
+        { key:  '3', short: 'Cerrado' }
+    ];
+    var colorMap = {
+        '-1': '#607d8b', '0': '#e67e22',
+        '2':  '#8e44ad', '3': '#27ae60', '4':'#d97706'
+    };
+    var html = '<div class="ot-status-pipe">';
+    steps.forEach(function(s) {
+        var sCfg  = ESTADO_CFG[s.key] || {};
+        var sStep = sCfg.step !== undefined ? sCfg.step : 0;
+        var cls   = '';
+        var activeColor = colorMap[e] || '#607d8b';
+        if      (sStep < activeStep)  cls = ' done';
+        else if (sStep === activeStep) cls = ' active';
+        var sty = (sStep === activeStep)
+            ? ' style="background:' + activeColor + ';border-color:' + activeColor + ';"'
+            : '';
+        html += '<div class="ot-status-step' + cls + '"' + sty + '>' + esc(s.short) + '</div>';
+    });
+    html += '</div>';
+    return html;
+}
+
+/* ── btnVerHtml ─────────────────────────────────────────────────── */
+function accionesOT(r){
+    var html=btnVerHtml(r.ot);
+    if(Number(r.estado_plano)===4)html+=' <button type="button" class="btn btn-success btn-sm" onclick="cerrarProyecto('+esc(JSON.stringify(r.ot))+',this)">Cerrar proyecto</button>';
+    return html;
+}
+function cerrarProyecto(ot,btn){
+    if(!confirm('¿Cerrar definitivamente el proyecto '+ot+'? Pasará a la página de OTs cerradas con sus documentos y anotaciones.'))return;
+    btn.disabled=true;
+    fetch('../../api/fh_ing/cambiar_estado.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ot:ot,estado:3,accion:'cerrar_proyecto'})})
+      .then(function(r){return r.json();}).then(function(d){if(!d.success)throw Error(d.message||'No se pudo cerrar.');showAlert('formAlert','success','Proyecto cerrado. Disponible en OTs cerradas.');cargarRegistros();})
+      .catch(function(e){showAlert('formAlert','danger',e.message);btn.disabled=false;});
+}
+function btnVerHtml(ot) {
+    return '<button class="btn-preview-ot" onclick="abrirReporte(\'' +
+        ot.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" title="Ver reporte">' +
+        '<i class="fas fa-eye"></i> Ver</button>';
+}
+
+/* ── cargarRegistros ────────────────────────────────────────────── */
+function cargarRegistros() {
+    var loadState  = document.getElementById('tblLoadingState');
+    var emptyState = document.getElementById('tblEmptyState');
+    var wrapper    = document.getElementById('tblWrapper');
+    if (loadState)  loadState.style.display  = 'block';
+    if (emptyState) emptyState.style.display = 'none';
+    if (wrapper)    wrapper.style.display    = 'none';
+    fetch(API_REGISTROS)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            dtRegistros = Array.isArray(data) ? data : [];
+            renderTabla(dtRegistros);
+            actualizarDatosRegistro();
+        })
+        .catch(function() { renderTabla([]); })
+        .finally(function() {
+            if (loadState) loadState.style.display = 'none';
+        });
+}
+
+function renderTabla(rows) {
+    var emptyState = document.getElementById('tblEmptyState');
+    var wrapper    = document.getElementById('tblWrapper');
+    var tbody      = document.getElementById('tblBody');
+    var badge      = document.getElementById('badgeOTs');
+    if (badge) badge.textContent = rows.length || '0';
+    if (!rows.length) {
+        if (emptyState) emptyState.style.display = 'block';
+        if (wrapper)    wrapper.style.display    = 'none';
+        return;
+    }
+    if (emptyState) emptyState.style.display = 'none';
+    if (wrapper)    wrapper.style.display    = '';
+    var html = '';
+    rows.forEach(function(r, i) {
+        var estado = (r.estado_plano !== undefined && r.estado_plano !== null)
+                     ? r.estado_plano : -1;
+        html += '<tr>' +
+            '<td>' + (i + 1) + '</td>' +
+            '<td><strong>' + esc(r.ot) + '</strong></td>' +
+            '<td>' + esc(r.proyecto) + '</td>' +
+            '<td>' + (r.elaborado_por ? esc(r.elaborado_por) : '<span class="text-muted">—</span>') + '</td>' +
+            '<td>' + fmtFecha(r.fecha_inicio || (r.created_at || '').substring(0, 10)) + '</td>' +
+            '<td>' + fmtFecha(r.actualizado_al) + '</td>' +
+            '<td>' + estadoBadgeHtml(estado) + '</td>' +
+            '<td style="text-align:center;">' + accionesOT(r) + '</td>' +
+            '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+/* ── cargarFinalizados ──────────────────────────────────────────── */
+function cargarFinalizados() {
+    var badge   = document.getElementById('finBadge');
+    var tbody   = document.getElementById('finBody');
+    var loading = document.getElementById('finLoading');
+    var empty   = document.getElementById('finEmpty');
+    var wrapper = document.getElementById('finWrapper');
+    if (loading) loading.style.display = 'block';
+    if (empty)   empty.style.display   = 'none';
+    if (wrapper) wrapper.style.display = 'none';
+    fetch(API_FINALIZADOS)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var rows = Array.isArray(data) ? data : [];
+            if (badge) badge.textContent = rows.length || '0';
+            if (!rows.length) {
+                if (empty) empty.style.display = 'block';
+                return;
+            }
+            if (wrapper) wrapper.style.display = '';
+            var html = '';
+            rows.forEach(function(r) {
+                html += '<tr>' +
+                    '<td><strong>' + esc(r.ot) + '</strong></td>' +
+                    '<td>' + esc(r.proyecto) + '</td>' +
+                    '<td>' + (r.elaborado_por ? esc(r.elaborado_por) : '<span class="text-muted">—</span>') + '</td>' +
+                    '<td>' + fmtFecha(r.fecha_inicio || (r.created_at || '').substring(0, 10)) + '</td>' +
+            '<td>' + fmtFecha(r.actualizado_al) + '</td>' +
+                    '<td style="text-align:center;">' + btnVerHtml(r.ot) + '</td>' +
+                    '</tr>';
+            });
+            tbody.innerHTML = html;
+        })
+        .catch(function() {
+            if (empty) empty.style.display = 'block';
+        })
+        .finally(function() {
+            if (loading) loading.style.display = 'none';
+        });
+}
+
+function toggleFinalizados() {
+    var panel   = document.getElementById('finPanel');
+    var chevron = document.getElementById('finChevron');
+    if (!panel) return;
+    var open = panel.style.display !== 'none';
+    panel.style.display = open ? 'none' : '';
+    if (chevron) chevron.className = open ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+}
+
+var elaboradorSesion = <?= json_encode($otUsuario['name'] ?? $otUsuario['username'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+function actualizarDatosRegistro() {
+    var codigo = document.getElementById('inputOT').value.trim().toUpperCase();
+    if (/^\d+$/.test(codigo)) codigo = 'OTC-' + codigo.padStart(6, '0');
+    var registro = dtRegistros.find(function(r) { return (r.ot || '').toUpperCase() === codigo; });
+    document.getElementById('elaboradoPor').value = registro ? registro.elaborado_por : elaboradorSesion;
+    var fecha = document.getElementById('fechaInicio');
+    fecha.readOnly = !!registro;
+    fecha.value = registro ? (registro.fecha_inicio || (registro.created_at || '').substring(0, 10)) : <?= json_encode($otHoy) ?>;
+    document.getElementById('actualizadoAl').value = registro ? (registro.actualizado_al || '') : <?= json_encode($otHoy) ?>;
+}
+document.getElementById('inputOT').addEventListener('input', actualizarDatosRegistro);
+
+/* ── guardar ────────────────────────────────────────────────────── */
+function guardar(btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando…';
+    var payload = {
+        ot:             document.getElementById('inputOT').value.trim(),
+        proyecto:       document.getElementById('inputProy').value.trim(),
+        fecha_inicio: document.getElementById('fechaInicio').value
+    };
+    if (!payload.ot) {
+        showAlert('formAlert', 'warning', 'Seleccione una OT del listado de proyectos.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Guardar Registro';
+        return;
+    }
+    fetch(API_GUARDAR, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            showAlert('formAlert', 'success', data.message || 'Registro guardado correctamente.');
+            document.getElementById('revisadoPor').value   = '';
+            document.getElementById('aprobadoPor').value   = '';
+            document.getElementById('actualizadoAl').value = data.actualizado_al;
+            document.getElementById('fechaInicio').value = data.fecha_inicio;
+            document.getElementById('fechaInicio').readOnly = true;
+            cargarRegistros();
+        } else {
+            showAlert('formAlert', 'danger', data.message || data.error || 'Error al guardar.');
+        }
+    })
+    .catch(function() {
+        showAlert('formAlert', 'danger', 'Error de conexión al guardar.');
+    })
+    .finally(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Guardar Registro';
+    });
+}
+
+/* ── Búsqueda directa por código OT ─────────────────────────────── */
+function buscarOTDirecta() {
+    var inputEl = document.getElementById('inputOT');
+    var proyEl  = document.getElementById('inputProy');
+    var v = inputEl.value.trim();
+    if (!v) return;
+
+    // Auto-formato: solo dígitos → OTC-XXXXXX
+    if (/^\d+$/.test(v)) {
+        v = 'OTC-' + v.padStart(6, '0');
+        inputEl.value = v;
+    }
+    var vLow = v.toLowerCase();
+
+    function encontrar() {
+        var found = todosProyectos.find(function(r) {
+            return (r.OT || '').toLowerCase() === vLow;
+        });
+        if (found) {
+            proyEl.value = found.Proyecto1 || '';
+            selectedOT   = found.OT || v;
+            selectedProy = found.Proyecto1 || '';
+            actualizarDatosRegistro();
+            showAlert('formAlert', 'success', '✓ Proyecto encontrado: ' + (found.Proyecto1 || ''));
+        } else {
+            proyEl.value = '';
+            selectedOT   = '';
+            selectedProy = '';
+            showAlert('formAlert', 'warning', 'No se encontró la OT "' + v + '" en SAP. Use ▤ para ver la lista completa.');
+        }
+    }
+
+    if (todosProyectos.length > 0) {
+        encontrar();
+    } else {
+        // Cargar lista SAP por primera vez
+        inputEl.disabled = true;
+        proyEl.placeholder = 'Buscando en SAP…';
+        fetch(API_PROYECTOS)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                todosProyectos = Array.isArray(data) ? data : [];
+                encontrar();
+            })
+            .catch(function() {
+                showAlert('formAlert', 'danger', 'Error al conectar con SAP.');
+            })
+            .finally(function() {
+                inputEl.disabled = false;
+                proyEl.placeholder = 'Se completa al buscar OT';
+            });
+    }
+}
+
+/* ── Modal selector de proyectos ────────────────────────────────── */
+function cargarProyectos() {
+    document.getElementById('tblModalBody').innerHTML =
+        '<tr><td colspan="5" class="text-center py-3 text-muted">' +
+        '<i class="fas fa-spinner fa-spin"></i> Cargando proyectos…</td></tr>';
+    fetch(API_PROYECTOS)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            todosProyectos = Array.isArray(data) ? data : [];
+            renderModalTabla(todosProyectos);
+        })
+        .catch(function() {
+            document.getElementById('tblModalBody').innerHTML =
+                '<tr><td colspan="5" class="text-center text-danger py-3">' +
+                '<i class="fas fa-exclamation-triangle"></i> Error al cargar proyectos</td></tr>';
+        });
+}
+
+function renderModalTabla(rows) {
+    var tbody = document.getElementById('tblModalBody');
+    var count = document.getElementById('modalCount');
+    if (count) count.textContent = rows.length;
+    if (!rows.length) {
+        tbody.innerHTML =
+            '<tr><td colspan="5" class="text-center text-muted py-3">No se encontraron proyectos</td></tr>';
+        return;
+    }
+    var html = '';
+    rows.forEach(function(r) {
+        var otCode = esc(r.OT || '');
+        var proy   = esc(r.Proyecto1 || '');
+        var pptoKg = r.TotalPesPptoTotaKg !== undefined ? (parseFloat(r.TotalPesPptoTotaKg) || 0).toFixed(1) : '—';
+        var netoKg = r.PeNetTotKg         !== undefined ? (parseFloat(r.PeNetTotKg)         || 0).toFixed(1) : '—';
+        var hhFab  = r.HHFab              !== undefined ? (parseFloat(r.HHFab)              || 0).toFixed(0) : '—';
+        html += '<tr style="cursor:pointer;" ' +
+                'onclick="seleccionarProyecto(\'' + otCode + '\',\'' + proy + '\')">' +
+            '<td><strong>' + otCode + '</strong></td>' +
+            '<td>' + proy + '</td>' +
+            '<td style="text-align:right;">' + pptoKg + '</td>' +
+            '<td style="text-align:right;">' + netoKg + '</td>' +
+            '<td style="text-align:right;">' + hhFab  + '</td>' +
+            '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function seleccionarProyecto(ot, proy) {
+    selectedOT   = ot;
+    selectedProy = proy;
+    document.getElementById('inputOT').value   = ot;
+    document.getElementById('inputProy').value = proy;
+    actualizarDatosRegistro();
+    if (window.$) $('#modalProyectos').modal('hide');
+}
+
+/* ── Reporte overlay ────────────────────────────────────────────── */
+function abrirReporte(ot) {
+    var overlay = document.getElementById('reportOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    document.getElementById('rptOT').textContent            = ot;
+    document.getElementById('rptProy').textContent           = '—';
+    document.getElementById('rptEstadoPill').textContent     = 'Cargando…';
+    document.getElementById('rptKpiRow').innerHTML           =
+        '<div style="padding:20px; color:#9ca3af;">' +
+        '<i class="fas fa-spinner fa-spin"></i> Cargando…</div>';
+    document.getElementById('rptGanttBody').innerHTML        =
+        '<div style="text-align:center; padding:40px; color:#9ca3af;">' +
+        '<i class="fas fa-spinner fa-spin" style="font-size:1.6rem; display:block; margin-bottom:10px;"></i>' +
+        'Cargando cronograma…</div>';
+    document.getElementById('rptPipeline').innerHTML         = '';
+    document.getElementById('rptSummaryFooter').innerHTML    = '';
+
+    // Reset tabs
+    document.querySelectorAll('.rpt-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.rpt-tab-pane').forEach(function(p) { p.classList.remove('active'); });
+    var firstTab  = document.querySelector('.rpt-tab-btn[data-tab="resumen"]');
+    var firstPane = document.getElementById('rptTabResumen');
+    if (firstTab)  firstTab.classList.add('active');
+    if (firstPane) firstPane.classList.add('active');
+
+    fetch(API_RESUMEN + '?ot=' + encodeURIComponent(ot))
+        .then(function(r) { return r.json(); })
+        .then(function(d) { renderReporte(d); })
+        .catch(function() {
+            document.getElementById('rptEstadoPill').textContent = 'Error';
+            document.getElementById('rptKpiRow').innerHTML =
+                '<p style="color:#ef4444; padding:16px;">Error al cargar el reporte.</p>';
+        });
+}
+
+function cerrarReporte() {
+    var overlay = document.getElementById('reportOverlay');
+    if (overlay) overlay.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+/* ── renderReporte ──────────────────────────────────────────────── */
+function renderReporte(d) { FHResumenOT.render(d); }
+
+/* ── renderGanttCompleto ────────────────────────────────────────── */
+function renderGanttCompleto(d) {
+    var ganttBody = document.getElementById('rptGanttBody');
+    if (!ganttBody) return;
+
+    var rows = [];
+
+    // Módulo 1 — Actividades
+    if (d.mod1 && d.mod1.items && d.mod1.items.length && d.fecha_inicio) {
+        var cur1 = parseDate(d.fecha_inicio);
+        d.mod1.items.forEach(function(it, i) {
+            var dias1 = parseFloat(it.dias) || 0;
+            if (dias1 <= 0) return;
+            var fi1 = it.fecha_inicio ? parseDate(it.fecha_inicio) : new Date(cur1);
+            var ff1 = it.fecha_fin    ? parseDate(it.fecha_fin)    : addDays(fi1, Math.max(1, Math.ceil(dias1)) - 1);
+            if (!fi1 || !ff1) { fi1 = new Date(cur1); ff1 = addDays(fi1, Math.max(1, Math.ceil(dias1)) - 1); }
+            cur1 = addDays(ff1, 1);
+            rows.push({
+                label: it.nombre || '—',
+                dias:  dias1,
+                fi: fi1, ff: ff1, mod: 'm1',
+                color: MOD_COLORS.m1[i % MOD_COLORS.m1.length]
+            });
+        });
+    }
+
+    // Módulo 2 — Planos
+    if (d.mod2 && d.mod2.items && d.mod2.items.length && d.mod2.fecha_inicio) {
+        var cur2 = parseDate(d.mod2.fecha_inicio);
+        d.mod2.items.forEach(function(it, i) {
+            var dias2 = parseFloat(it.dias) || 0;
+            if (dias2 <= 0) return;
+            var fi2 = it.fecha_inicio ? parseDate(it.fecha_inicio) : new Date(cur2);
+            var ff2 = it.fecha_fin    ? parseDate(it.fecha_fin)    : addDays(fi2, Math.max(1, Math.ceil(dias2)) - 1);
+            if (!fi2 || !ff2) { fi2 = new Date(cur2); ff2 = addDays(fi2, Math.max(1, Math.ceil(dias2)) - 1); }
+            cur2 = addDays(ff2, 1);
+            rows.push({
+                label: (it.cod_plano || '') + (it.desc_plano ? ' — ' + it.desc_plano : ''),
+                dias:  dias2,
+                fi: fi2, ff: ff2, mod: 'm2',
+                color: MOD_COLORS.m2[i % MOD_COLORS.m2.length]
+            });
+        });
+    }
+
+    // Módulo 3 — Avance (horas / 8 = días calendario)
+    if (d.mod3 && d.mod3.items && d.mod3.items.length && d.mod3.fecha_inicio) {
+        var cur3 = parseDate(d.mod3.fecha_inicio);
+        d.mod3.items.forEach(function(it, i) {
+            var horas3   = parseFloat(it.dias) || 0; // 'dias' almacena horas en Mod3
+            if (horas3 <= 0) return;
+            var diasCal3 = Math.max(1, Math.ceil(horas3 / 8)); // 8h = 1 día laboral
+            var fi3 = new Date(cur3);
+            var ff3 = addDays(fi3, diasCal3 - 1);
+            cur3 = addDays(ff3, 1);
+            rows.push({
+                label: (it.cod_plano || '') + (it.desc_mod3 ? ' - ' + it.desc_mod3 : ''),
+                dias:  diasCal3, horas: horas3,
+                fi: fi3, ff: ff3, mod: 'm3',
+                color: MOD_COLORS.m3[i % MOD_COLORS.m3.length]
+            });
+        });
+    }
+
+    var validRows = rows.filter(function(r) {
+        return r.fi && r.ff && !isNaN(r.fi.getTime()) && !isNaN(r.ff.getTime());
+    });
+
+    if (!validRows.length) {
+        ganttBody.innerHTML =
+            '<div style="text-align:center; padding:40px 20px; color:#9ca3af;">' +
+            '<i class="fas fa-info-circle" style="font-size:1.4rem; display:block; margin-bottom:10px;"></i>' +
+            'No hay cronograma disponible para esta OT.</div>';
+        return;
+    }
+
+    var allDates   = validRows.reduce(function(acc, r) { acc.push(r.fi, r.ff); return acc; }, []);
+    var gStart     = new Date(Math.min.apply(null, allDates));
+    var gEnd       = new Date(Math.max.apply(null, allDates));
+    var totalDays  = Math.max(1, diffDays(gStart, gEnd) + 1);
+    var PX         = Math.max(6, Math.min(22, Math.floor(860 / totalDays)));
+    var totalWidth = Math.max(600, totalDays * PX);
+
+    // Cabecera de meses
+    var mCursor = new Date(gStart.getFullYear(), gStart.getMonth(), 1);
+    var months  = [];
+    var numMonths = 0;
+    var MNAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    while (mCursor <= gEnd) {
+        var mEnd     = new Date(mCursor.getFullYear(), mCursor.getMonth() + 1, 0);
+        var mStart_c = gStart > mCursor ? gStart : mCursor;
+        var mEnd_c   = gEnd   < mEnd    ? gEnd   : mEnd;
+        var mDays    = diffDays(mStart_c, mEnd_c) + 1;
+        months.push({ label: MNAMES[mCursor.getMonth()] + ' ' + mCursor.getFullYear(), width: mDays * PX });
+        numMonths++;
+        mCursor = new Date(mCursor.getFullYear(), mCursor.getMonth() + 1, 1);
+    }
+
+    // Línea Hoy
+    var today     = new Date(); today.setHours(0,0,0,0);
+    var todayOff  = diffDays(gStart, today);
+    var showToday = todayOff >= 0 && todayOff <= totalDays;
+
+    // Render table
+    var html = '<table class="rptg-table"><thead><tr>';
+    html += '<th class="rptg-th sticky" style="left:0;width:200px;min-width:200px;z-index:4;">Actividad / Plano</th>';
+    html += '<th class="rptg-th sticky" style="left:200px;width:50px;min-width:50px;text-align:center;z-index:4;">Dur.</th>';
+    months.forEach(function(m) {
+        html += '<th class="rptg-th" style="width:' + Math.round(m.width) + 'px;min-width:' +
+                Math.round(m.width) + 'px;text-align:center;">' + m.label + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+
+    var lastMod = null;
+    validRows.forEach(function(r) {
+        if (r.mod !== lastMod) {
+            lastMod = r.mod;
+            var modLabels = { m1: 'Módulo 1 — Actividades', m2: 'Módulo 1 — Planos', m3: 'Módulo 2 — Detalle' };
+            var modCols   = { m1: '#2563eb', m2: '#d97706', m3: '#7c3aed' };
+            html += '<tr class="rptg-mod-header"><td colspan="' + (numMonths + 2) +
+                    '" style="background:' + modCols[r.mod] + '18;color:' + modCols[r.mod] +
+                    ';font-weight:700;font-size:.78rem;padding:4px 8px;">' +
+                    (modLabels[r.mod] || '') + '</td></tr>';
+        }
+        var bLeft = Math.round(diffDays(gStart, r.fi) * PX);
+        var bW    = Math.max(4, Math.round((diffDays(r.fi, r.ff) + 1) * PX));
+        var durLabel = r.horas !== undefined ? r.horas + 'h' : (r.dias || 0) + 'd';
+
+        html += '<tr class="rptg-row">';
+        html += '<td class="rptg-td sticky rptg-label" style="left:0;width:200px;">' +
+                esc(r.label.substring(0, 40)) + '</td>';
+        html += '<td class="rptg-td sticky rptg-dur" style="left:200px;width:50px;">' + durLabel + '</td>';
+        html += '<td class="rptg-bar-td" colspan="' + numMonths + '">';
+        html += '<div class="rptg-bar-cell" style="min-width:' + totalWidth + 'px;">';
+        if (showToday) {
+            html += '<div class="rptg-today-line" style="left:' + Math.round(todayOff * PX) + 'px;"></div>';
+        }
+        html += '<div class="rptg-bar" style="left:' + bLeft + 'px;width:' + bW + 'px;background:' +
+                r.color + ';" title="' + fmtShort(r.fi) + ' a ' + fmtShort(r.ff) + ' (' + durLabel + ')">';
+        if (bW > 36) html += '<span class="rptg-bar-txt">' + durLabel + '</span>';
+        html += '</div>';
+        html += '</div></td></tr>';
+    });
+    html += '</tbody></table>';
+    ganttBody.innerHTML = html;
+}
+
+/* ── Inicialización ─────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+
+    // Filtro modal de proyectos
+    var modalSearch = document.getElementById('modalSearch');
+    if (modalSearch) {
+        modalSearch.addEventListener('input', function() {
+            var q = this.value.trim().toLowerCase();
+            var filtered = q ? todosProyectos.filter(function(r) {
+                var o = (r.OT       || '').toLowerCase();
+                var p = (r.Proyecto1|| '').toLowerCase();
+                return o.includes(q) || p.includes(q);
+            }) : todosProyectos;
+            renderModalTabla(filtered);
+        });
+    }
+    var clearBtn = document.getElementById('btnClearFilter');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            document.getElementById('modalSearch').value = '';
+            renderModalTabla(todosProyectos);
+        });
+    }
+    if (window.$) {
+        $('#modalProyectos').on('show.bs.modal', function() {
+            cargarProyectos();
+        });
+    }
+
+    // Filtro tabla de OTs
+    var filterOTs = document.getElementById('filterOTs');
+    if (filterOTs) {
+        filterOTs.addEventListener('input', function() {
+            var q = this.value.trim().toLowerCase();
+            if (!q) { renderTabla(dtRegistros); return; }
+            renderTabla(dtRegistros.filter(function(r) {
+                return (r.ot          || '').toLowerCase().includes(q) ||
+                       (r.proyecto    || '').toLowerCase().includes(q) ||
+                       (r.elaborado_por || '').toLowerCase().includes(q);
+            }));
+        });
+    }
+
+    // Tab switching (report overlay)
+    document.querySelectorAll('.rpt-tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.rpt-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+            document.querySelectorAll('.rpt-tab-pane').forEach(function(p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            var tabName = btn.dataset.tab;
+            var tabEl   = document.getElementById('rptTab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+            if (tabEl) tabEl.classList.add('active');
+        });
+    });
+
+    // Cerrar overlay al pulsar Esc
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') cerrarReporte();
+    });
+
+    // Auto-formato inputOT: "4135" → "OTC-004135" (al salir del campo sin buscar)
+    var inputOT = document.getElementById('inputOT');
+    if (inputOT) {
+        inputOT.addEventListener('blur', function () {
+            var v = this.value.trim();
+            if (v && /^\d+$/.test(v)) {
+                this.value = 'OTC-' + v.padStart(6, '0');
+            }
+        });
+    }
+
+    // Cargar datos iniciales
+    cargarRegistros();
+
+});
+</script>

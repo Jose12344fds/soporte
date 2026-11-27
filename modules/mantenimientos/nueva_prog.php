@@ -1,0 +1,427 @@
+<?php
+$page_title = 'Nueva Programacion';
+require_once(__DIR__ . '/../../includes/load.php');
+require_once(__DIR__ . '/../../config/app.php');
+require_permiso('mantenimientos', 'ver');
+
+$code = isset($_GET['code']) ? trim($_GET['code']) : '';
+$es_edicion = ($code !== '');
+if ($es_edicion) {
+    $page_title = 'Editar Programacion';
+}
+
+$extraCss = [
+    'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css',
+    'https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@1.5.2/dist/select2-bootstrap4.min.css',
+];
+
+include_once(__DIR__ . '/../../layouts/header.php');
+?>
+
+<section class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1>
+                    <i class="fas fa-<?= $es_edicion ? 'edit' : 'plus-circle' ?> mr-2 text-success"></i>
+                    <?= $es_edicion ? 'Editar Programacion ' . htmlspecialchars($code, ENT_QUOTES) : 'Nueva Programacion' ?>
+                </h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="../../home.php">Inicio</a></li>
+                    <li class="breadcrumb-item"><a href="programacion.php">Programacion</a></li>
+                    <li class="breadcrumb-item active"><?= $es_edicion ? 'Editar' : 'Nueva' ?></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="content">
+    <div class="container-fluid">
+        <form id="formProg" autocomplete="off">
+            <input type="hidden" id="codeOrig" value="<?= htmlspecialchars($code, ENT_QUOTES) ?>">
+            <input type="hidden" id="esEdicion" value="<?= $es_edicion ? '1' : '0' ?>">
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card card-outline card-success">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-calendar-alt mr-2"></i>Datos de la Programacion</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Codigo</label>
+                                        <input type="text" id="codeProg" name="code" class="form-control text-uppercase"
+                                               placeholder="Auto-generado"
+                                               <?= $es_edicion ? 'readonly value="' . htmlspecialchars($code, ENT_QUOTES) . '"' : '' ?>
+                                               maxlength="10">
+                                        <small class="text-muted">Se genera automatico si lo dejas vacio.</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Descripcion <span class="text-danger">*</span></label>
+                                        <input type="text" id="descProg" name="name" class="form-control" maxlength="100" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="font-weight-bold">Equipo <span class="text-danger">*</span></label>
+                                <select id="selectEquipo" name="itemcode" class="form-control" style="width:100%;" required>
+                                    <option value="">Buscar equipo por codigo o nombre</option>
+                                </select>
+                                <small class="text-muted">Equipos registrados en SAP.</small>
+                            </div>
+
+                            <div id="infoEquipo" class="alert alert-light border mb-3" style="display:none;">
+                                <div class="row">
+                                    <div class="col-6"><strong>Inventario:</strong> <span id="eqInventario">-</span></div>
+                                    <div class="col-6"><strong>Serie:</strong> <span id="eqSerie">-</span></div>
+                                    <div class="col-6 mt-1"><strong>Marca:</strong> <span id="eqMarca">-</span></div>
+                                    <div class="col-6 mt-1"><strong>Modelo:</strong> <span id="eqModelo">-</span></div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Tipo de Mantenimiento <span class="text-danger">*</span></label>
+                                        <select id="selectTipo" name="tipomant" class="form-control" required>
+                                            <option value="">Seleccionar</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Frecuencia <span class="text-danger">*</span></label>
+                                        <select id="selectFrecuencia" name="frecuencia" class="form-control" required>
+                                            <option value="">Seleccionar</option>
+                                            <option value="Semanal">Semanal</option>
+                                            <option value="Quincenal">Quincenal</option>
+                                            <option value="Mensual">Mensual</option>
+                                            <option value="Bimensual">Bimensual</option>
+                                            <option value="Trimestral">Trimestral</option>
+                                            <option value="Semestral">Semestral</option>
+                                            <option value="Anual">Anual</option>
+                                            <option value="Bienal">Bienal (cada 2 años)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Modalidad <span class="text-danger">*</span></label>
+                                        <select id="selectModalidad" name="modalidad" class="form-control" required>
+                                            <option value="">F.D. - Falta definir</option>
+                                            <option value="MR">Mantenimiento rutinario</option>
+                                            <option value="M">Mantenimiento</option>
+                                        </select>
+                                        <small class="text-muted">Se guarda como MR o M en U_Modalidad.</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Fecha Programada <span class="text-danger">*</span></label>
+                                        <input type="date" id="fechaProg" name="fechaprog" class="form-control" required value="<?= date('Y-m-d') ?>">
+                                        <small class="text-muted">Define la fecha de la primera ocurrencia del plan.</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Estado</label>
+                                        <select id="selectEstado" name="estado" class="form-control">
+                                            <option value="Pendiente" selected>Pendiente</option>
+                                            <option value="Ejecutado">Ejecutado</option>
+                                            <option value="Vencido">Vencido</option>
+                                            <option value="Ejecutado fuera de fecha">Ejecutado fuera de fecha</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Fecha Inicio del Plan <span class="text-danger">*</span></label>
+                                        <input type="date" id="fechaInicioPlan" name="fecha_inicio_plan" class="form-control" required value="<?= date('Y-m-d') ?>">
+                                        <small class="text-muted">Limite inicial del plan; la primera ocurrencia usa la fecha programada.</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Fecha Fin del Plan</label>
+                                        <input type="date" id="fechaFinPlan" name="fecha_fin_plan" class="form-control">
+                                        <small class="text-muted">Si queda vacia, genera hasta diciembre del anio base.</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Anio Base</label>
+                                        <input type="number" id="anioBase" name="anio_base" class="form-control" min="2020" max="2100" value="<?= date('Y') ?>">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Genera Detalle</label>
+                                        <select id="generaAuto" name="genera_auto" class="form-control">
+                                            <option value="Y" selected>Si</option>
+                                            <option value="N">No</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">Activo</label>
+                                        <select id="activoPlan" name="activo" class="form-control">
+                                            <option value="Y" selected>Si</option>
+                                            <option value="N">No</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label class="font-weight-bold">Observaciones</label>
+                                <textarea id="observacion" name="observacion" class="form-control" rows="6" maxlength="20000"></textarea>
+                                <small class="text-muted"><span id="observacionCount">0</span>/20,000 caracteres. Esta indicacion se aplicara a todas las ocurrencias del plan.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card card-success">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-save mr-2"></i>Guardar</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="alertGuardar" class="alert" style="display:none;"></div>
+                            <button type="submit" class="btn btn-success btn-block btn-lg font-weight-bold" id="btnGuardar">
+                                <i class="fas fa-save mr-2"></i><?= $es_edicion ? 'Actualizar' : 'Registrar Programacion' ?>
+                            </button>
+                            <a href="programacion.php" class="btn btn-secondary btn-block mt-2">
+                                <i class="fas fa-arrow-left mr-2"></i>Cancelar
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card card-outline card-info">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-route mr-2"></i>Flujo</h3>
+                        </div>
+                        <div class="card-body p-2 small">
+                            <div class="mb-2"><span class="badge badge-primary mr-2">1</span>Guardar plan maestro en <strong>@TAMA_PROGMANT</strong></div>
+                            <div class="mb-2"><span class="badge badge-success mr-2">2</span>Generar ocurrencias en <strong>@TAMA_PROGDET</strong></div>
+                            <div class="mb-2"><span class="badge badge-info mr-2">3</span>Crear OT contra una ocurrencia</div>
+                            <div><span class="badge badge-secondary mr-2">4</span>Cerrar OT y reflejar ejecutado</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+
+<?php
+$baseUrl = BASE_URL;
+$btnLabel = $es_edicion ? 'Actualizar' : 'Registrar Programacion';
+$inlineJs = <<<JS
+var codeOrig = document.getElementById('codeOrig').value;
+var esEdicion = document.getElementById('esEdicion').value === '1';
+
+$(function() {
+    $('#selectEquipo').select2({
+        theme: 'bootstrap4',
+        placeholder: 'Buscar equipo por codigo o nombre',
+        allowClear: true,
+        minimumInputLength: 1,
+        ajax: {
+            url: '$baseUrl/api/mantenimientos/get_equipos.php',
+            dataType: 'json',
+            delay: 300,
+            data: function(p) { return { search: p.term, para_programacion: 1 }; },
+            processResults: function(d) { return { results: d }; },
+            cache: true
+        }
+    });
+
+    $('#selectEquipo').on('select2:select', function(e) {
+        var d = e.params.data;
+        document.getElementById('eqInventario').textContent = d.InventryNo || '-';
+        document.getElementById('eqSerie').textContent = d.AssetSerNo || '-';
+        document.getElementById('eqMarca').textContent = d.Marca || '-';
+        document.getElementById('eqModelo').textContent = d.Modelo || '-';
+        document.getElementById('infoEquipo').style.display = '';
+    });
+
+    $('#selectEquipo').on('select2:clear select2:unselect', function() {
+        document.getElementById('infoEquipo').style.display = 'none';
+    });
+});
+
+function cargarTipo() {
+    fetch('$baseUrl/api/mantenimientos/get_tipomant.php')
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            var sel = document.getElementById('selectTipo');
+            data.forEach(function(t) {
+                var opt = document.createElement('option');
+                opt.value = t.Code;
+                opt.textContent = t.Code + ' - ' + t.Name;
+                sel.appendChild(opt);
+            });
+            if (esEdicion) {
+                precargarDatos();
+            }
+        });
+}
+
+function precargarDatos() {
+    fetch('$baseUrl/api/mantenimientos/get_prog.php?plan_code=' + encodeURIComponent(codeOrig))
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            if (!data || !data[0]) return;
+            var row = data[0];
+            var opt = new Option((row.U_ItemCode || '') + ' - ' + (row.ItemName || ''), row.U_ItemCode, true, true);
+            $('#selectEquipo').append(opt).trigger('change');
+            document.getElementById('eqInventario').textContent = row.InventryNo || '-';
+            document.getElementById('eqSerie').textContent = row.AssetSerNo || '-';
+            document.getElementById('eqMarca').textContent = row.Marca || '-';
+            document.getElementById('eqModelo').textContent = row.Modelo || '-';
+            document.getElementById('infoEquipo').style.display = '';
+
+            document.getElementById('descProg').value = row.Name || '';
+            document.getElementById('selectTipo').value = row.U_TipoMant || '';
+            document.getElementById('selectModalidad').value = row.U_Modalidad === 'M' || row.U_Modalidad === 'MR' ? row.U_Modalidad : '';
+            document.getElementById('selectFrecuencia').value = row.U_Frecuencia || '';
+            document.getElementById('fechaProg').value = (row.U_FechaProg || '').split('T')[0];
+            document.getElementById('fechaInicioPlan').value = (row.U_FechaInicioPlan || row.U_FechaProg || '').split('T')[0];
+            document.getElementById('fechaFinPlan').value = (row.U_FechaFinPlan || '').split('T')[0];
+            document.getElementById('anioBase').value = row.U_AnioBase || ((row.U_FechaInicioPlan || row.U_FechaProg || '').split('-')[0]) || '';
+            document.getElementById('generaAuto').value = row.U_GeneraAuto || 'Y';
+            document.getElementById('activoPlan').value = row.U_Activo || 'Y';
+            document.getElementById('selectEstado').value = row.U_Estado || 'Pendiente';
+            document.getElementById('observacion').value = row.U_Observacion || '';
+            document.getElementById('observacionCount').textContent = String(row.U_Observacion || '').length;
+        });
+}
+
+document.getElementById('observacion').addEventListener('input', function() {
+    document.getElementById('observacionCount').textContent = this.value.length;
+});
+
+document.getElementById('formProg').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    var code = document.getElementById('codeProg').value.trim().toUpperCase();
+    var name = document.getElementById('descProg').value.trim();
+    var itemcode = document.getElementById('selectEquipo').value;
+    var tipo = document.getElementById('selectTipo').value;
+    var modalidad = document.getElementById('selectModalidad').value;
+    var frec = document.getElementById('selectFrecuencia').value;
+    var fecha = document.getElementById('fechaProg').value;
+    var fechaIni = document.getElementById('fechaInicioPlan').value;
+    var fechaFin = document.getElementById('fechaFinPlan').value;
+    var anioBase = document.getElementById('anioBase').value;
+    var genera = document.getElementById('generaAuto').value;
+    var activo = document.getElementById('activoPlan').value;
+    var estado = document.getElementById('selectEstado').value;
+    var observ = document.getElementById('observacion').value.trim();
+
+    if (!name || !itemcode || !tipo || !modalidad || !frec || !fecha || !fechaIni) {
+        Swal.fire('Campos requeridos', 'Complete descripcion, equipo, tipo, frecuencia, fecha programada y fecha inicio del plan.', 'warning');
+        return;
+    }
+
+    if (!anioBase) {
+        anioBase = fechaIni.substring(0, 4);
+    }
+    if (fecha < fechaIni) {
+        Swal.fire('Fecha no valida', 'La fecha programada no puede ser anterior al inicio del plan.', 'warning');
+        return;
+    }
+    if (fechaFin && fechaFin < fechaIni) {
+        Swal.fire('Rango no valido', 'La fecha fin no puede ser anterior al inicio del plan.', 'warning');
+        return;
+    }
+    if (fechaFin && fecha > fechaFin) {
+        Swal.fire('Fecha fuera del plan', 'La fecha programada debe estar dentro del rango del plan.', 'warning');
+        return;
+    }
+    if (fecha.substring(0, 4) !== String(anioBase)) {
+        Swal.fire('Año no valido', 'La fecha programada debe pertenecer al año base seleccionado.', 'warning');
+        return;
+    }
+
+    var btn = document.getElementById('btnGuardar');
+    var alertEl = document.getElementById('alertGuardar');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Guardando...';
+    alertEl.style.display = 'none';
+
+    var payload = {
+        code: esEdicion ? codeOrig : code,
+        es_edicion: esEdicion,
+        name: name,
+        itemcode: itemcode,
+        tipomant: tipo,
+        modalidad: modalidad,
+        fechaprog: fecha,
+        fecha_inicio_plan: fechaIni,
+        fecha_fin_plan: fechaFin,
+        frecuencia: frec,
+        anio_base: anioBase,
+        genera_auto: genera,
+        activo: activo,
+        estado: estado,
+        observacion: observ
+    };
+
+    fetch('$baseUrl/api/mantenimientos/guardar_prog.php', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(json) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save mr-2"></i>$btnLabel';
+
+        if (json.success) {
+            var msg = (json.action === 'inserted')
+                ? 'Programacion ' + (json.code || '') + ' registrada. Ocurrencias generadas: ' + (json.generated || 0)
+                : 'Programacion actualizada. Ocurrencias generadas: ' + (json.generated || 0);
+            Swal.fire({ icon:'success', title:'Guardado', text: msg, timer: 2400, showConfirmButton:false })
+                .then(function(){ window.location.href = 'programacion.php'; });
+        } else {
+            alertEl.className = 'alert alert-danger';
+            alertEl.textContent = json.error || 'Error al guardar.';
+            alertEl.style.display = '';
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save mr-2"></i>$btnLabel';
+        alertEl.className = 'alert alert-danger';
+        alertEl.textContent = 'Error de conexion: ' + err.message;
+        alertEl.style.display = '';
+    });
+});
+
+$(document).ready(function() {
+    cargarTipo();
+});
+JS;
+
+include_once(__DIR__ . '/../../layouts/footer.php');
+?>

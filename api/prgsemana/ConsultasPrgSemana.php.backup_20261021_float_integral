@@ -1,0 +1,322 @@
+<?php
+/**
+ * ConsultasPrgSemana.php — Consultas MySQL para módulo ProgramarSemana v2
+ * Migrado desde consultasAjax1/consulta*.php
+ */
+require_once __DIR__ . '/ConexionLocal.php';
+
+class ConsultasPrgSemana {
+
+    /* ════════════════════════════════════════════
+       LISTA MO para subquery UNION dinámica
+       ════════════════════════════════════════════ */
+    private static $MO_COLUMNS = [
+        'MO001_1','MO001_2','MO002','MO004','MO014',
+        'MO008_1','MO008_2','MO007_1','MO007_2',
+        'MO003','MO015','MO005','MO009','MO004P',
+        'MO006','MO012','MO011','MO020','MO010',
+        'MO050','MO060','MO070','MO080'
+    ];
+
+    /**
+     * Genera la sub-query UNION que mapea cada columna MO a filas.
+     * Se usa en getProgramacion, getSumAvance, getEstadoProgramado.
+     */
+    private static function buildUnionSubquery(int $idPadreOT, string $codPdreQuoted): string {
+        $parts = [];
+        foreach (self::$MO_COLUMNS as $mo) {
+            $parts[] = "SELECT IdHijOT, Year, ProjectCode, CodPdre, Npdre, ClientName, Cantidad, HHFab,
+                        PesPptoTotaKg, PeSoldaduraKg, IdPadreOT,
+                        '{$mo}' AS MO_Column, `{$mo}` AS MO_Value
+                 FROM othija
+                 WHERE IdPadreOT = {$idPadreOT} AND CodPdre = {$codPdreQuoted}";
+        }
+        return '(' . implode("\nUNION\n", $parts) . ')';
+    }
+
+    /* ════════════════════════════════════════════
+       1. OTs validadas (Estado_OT = 2)
+       Origen: consultasAjax1/consulta.php
+       ════════════════════════════════════════════ */
+    public static function getOTsValidadas(): array {
+        $pdo = ConexionLocal::conectar();
+        $stmt = $pdo->query("SELECT * FROM otpadre WHERE Estado_OT = 2");
+        return $stmt->fetchAll();
+    }
+
+    /* ════════════════════════════════════════════
+       2. Items de subconsulta (por IdPadre + tipo)
+       Origen: consultasAjax/consulta8.php
+       ════════════════════════════════════════════ */
+    public static function getItems(int $idPadre, int $tipo = 1): array {
+        $pdo = ConexionLocal::conectar();
+
+        $moGroups = [
+            1 => 'T1.MO001_1+T1.MO001_2+T1.MO002+T1.MO004+T1.MO014+T1.MO008_1+T1.MO008_2+T1.MO007_1+T1.MO007_2+T1.MO003+T1.MO015+T1.MO005+T1.MO009+T1.MO004P+T1.MO006+T1.MO012+T1.MO011+T1.MO020+T1.MO010+IFNULL(T1.MO050,0)+IFNULL(T1.MO060,0)+IFNULL(T1.MO070,0)+IFNULL(T1.MO080,0)',
+            2 => 'T1.MO001_1+T1.MO001_2+T1.MO002+T1.MO004+T1.MO014',
+            3 => 'T1.MO008_1+T1.MO008_2+T1.MO007_1+T1.MO007_2',
+            4 => 'T1.MO003+T1.MO005+T1.MO009+T1.MO004P+T1.MO006',
+            5 => 'T1.MO015',
+            6 => 'T1.MO012+T1.MO011+T1.MO020+T1.MO010'
+        ];
+
+        if (!isset($moGroups[$tipo])) return [];
+
+        $sut = $moGroups[$tipo];
+        $sql = "SELECT T0.*, T0.ProjectCode AS proyecto, T1.*,
+                       IFNULL(T1.MO050,0) AS MO050, IFNULL(T1.MO060,0) AS MO060,
+                       IFNULL(T1.MO070,0) AS MO070, IFNULL(T1.MO080,0) AS MO080,
+                       ({$sut}) AS SUT
+                FROM otpadre T0
+                LEFT JOIN othija T1 ON T0.IdPadre = T1.IdPadreOT
+                WHERE T0.IdPadre = :idPadre";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':idPadre' => $idPadre]);
+        return $stmt->fetchAll();
+    }
+
+    /* ════════════════════════════════════════════
+       3. Programación por proceso (flotante)
+       Origen: consultasAjax1/consulta2.php
+       ════════════════════════════════════════════ */
+    public static function getProgramacion(int $idPadreOT, string $codPdre, string $proceso): array {
+        $pdo = ConexionLocal::conectar();
+        $codPdreQ = $pdo->quote($codPdre);
+        $procesoQ = $pdo->quote($proceso);
+        $union = self::buildUnionSubquery($idPadreOT, $codPdreQ);
+
+        $sql = "SELECT T0.IdPrograma, T0.*, T1.*
+                FROM programadorsem T0
+                LEFT JOIN {$union} T1
+                  ON T1.IdPadreOT = T0.otpadre AND T1.CodPdre = T0.CodPdre AND T1.MO_Column = T0.CodProceso
+                WHERE T0.otpadre = {$idPadreOT}
+                  AND T0.CodPdre = {$codPdreQ}
+                  AND T0.CodProceso = {$procesoQ}";
+
+        $stmt = $pdo->query($sql);
+        return $stmt->fetchAll();
+    }
+
+    /* ════════════════════════════════════════════
+       4. SUM(Avance) de un proceso
+       Origen: consultasAjax1/consulta2_1.php
+       ════════════════════════════════════════════ */
+    public static function getSumAvance(int $idPadreOT, string $codPdre, string $proceso): float {
+        $pdo = ConexionLocal::conectar();
+        $codPdreQ = $pdo->quote($codPdre);
+        $procesoQ = $pdo->quote($proceso);
+        $union = self::buildUnionSubquery($idPadreOT, $codPdreQ);
+
+        $sql = "SELECT SUM(T0.Avance) AS total
+                FROM programadorsem T0
+                LEFT JOIN {$union} T1
+                  ON T1.IdPadreOT = T0.otpadre AND T1.CodPdre = T0.CodPdre AND T1.MO_Column = T0.CodProceso
+                WHERE T0.otpadre = {$idPadreOT}
+                  AND T0.CodPdre = {$codPdreQ}
+                  AND T0.CodProceso = {$procesoQ}";
+
+        $stmt = $pdo->query($sql);
+        $row = $stmt->fetch();
+        return (float)($row['total'] ?? 0);
+    }
+
+    /* ════════════════════════════════════════════
+       5. Estado programado de un proceso
+       Origen: consultasAjax1/consulta2_2.php
+       ════════════════════════════════════════════ */
+    public static function getEstadoProgramado(int $idPadreOT, string $codPdre, string $proceso): int {
+        $pdo = ConexionLocal::conectar();
+        $codPdreQ = $pdo->quote($codPdre);
+        $procesoQ = $pdo->quote($proceso);
+        $union = self::buildUnionSubquery($idPadreOT, $codPdreQ);
+
+        $sql = "SELECT
+                    CASE
+                        WHEN GROUP_CONCAT(DISTINCT T0.Estado) = '2' THEN 2
+                        WHEN GROUP_CONCAT(DISTINCT T0.Estado) = '1' THEN 1
+                        WHEN GROUP_CONCAT(DISTINCT T0.Estado) = '1,2' THEN 1
+                        ELSE 1
+                    END AS RESULT
+                FROM programadorsem T0
+                LEFT JOIN {$union} T1
+                  ON T1.IdPadreOT = T0.otpadre AND T1.CodPdre = T0.CodPdre AND T1.MO_Column = T0.CodProceso
+                WHERE T0.otpadre = {$idPadreOT}
+                  AND T0.CodPdre = {$codPdreQ}
+                  AND T0.CodProceso = {$procesoQ}";
+
+        $stmt = $pdo->query($sql);
+        $row = $stmt->fetch();
+        return (int)($row['RESULT'] ?? 1);
+    }
+
+    /* ════════════════════════════════════════════
+       6. Guardar programación (INSERT batch)
+       Origen: consultasAjax1/consulta3.php
+       ════════════════════════════════════════════ */
+    public static function guardarProgramacion(array $datos): array {
+        $pdo = ConexionLocal::conectar();
+
+        $stmtVerify  = $pdo->prepare("SELECT COUNT(*) FROM programadorsem WHERE Aniio=:a AND Semana=:s AND CodPdre=:cp AND CodProceso=:pr");
+        $stmtInsert  = $pdo->prepare("INSERT INTO programadorsem (otpadre, CodProyecto, CodProceso, CodPdre, Aniio, Semana, Avance, TotHoras, AvanceReal, Estado, Fabricacion)
+                                       VALUES (:ot,:cy,:pr,:cp,:a,:s,:av,:th,'0','1',:fab)");
+        $stmtHist    = $pdo->prepare("INSERT INTO programacion_historico (id_programa,anio,semana,avance,tot_horas,version_tipo,fecha_creacion,otpadre,CodProyecto,CodProceso,CodPdre)
+                                       VALUES (:id,:a,:s,:av,:th,:vt,NOW(),:ot,:cy,:pr,:cp)");
+        $stmtCheckBL = $pdo->prepare("SELECT COUNT(*) as total FROM programacion_historico WHERE version_tipo='BASELINE' AND otpadre=:ot AND CodProyecto=:cy AND CodProceso=:pr AND CodPdre=:cp");
+        $stmtSelProg = $pdo->prepare("SELECT IdPrograma,Aniio,Semana,Avance,TotHoras FROM programadorsem WHERE otpadre=:ot AND CodProyecto=:cy AND CodProceso=:pr AND CodPdre=:cp ORDER BY Aniio,Semana");
+        $stmtInsBL   = $pdo->prepare("INSERT INTO programacion_historico (id_programa,anio,semana,avance,tot_horas,version_tipo,fecha_creacion,otpadre,CodProyecto,CodProceso,CodPdre)
+                                       VALUES (:id,:a,:s,:av,:th,'BASELINE',NOW(),:ot,:cy,:pr,:cp)");
+
+        $inserted = [];
+        $skipped  = [];
+        $errors   = [];
+
+        try {
+            $pdo->beginTransaction();
+
+            // Determinar procesos afectados y si ya tienen baseline
+            $processes = [];
+            foreach ($datos as $d) {
+                if (!isset($d['idPadreOT'],$d['proyecto'],$d['proceso'],$d['codPdre'])) continue;
+                $key = "{$d['idPadreOT']}||{$d['proyecto']}||{$d['proceso']}||{$d['codPdre']}";
+                $processes[$key] = $d;
+            }
+
+            $baselineExists = [];
+            foreach ($processes as $key => $d) {
+                $stmtCheckBL->execute([':ot'=>$d['idPadreOT'],':cy'=>$d['proyecto'],':pr'=>$d['proceso'],':cp'=>$d['codPdre']]);
+                $baselineExists[$key] = ((int)$stmtCheckBL->fetchColumn()) > 0;
+            }
+
+            foreach ($datos as $idx => $f) {
+                if (!isset($f['idPadreOT'],$f['proyecto'],$f['proceso'],$f['codPdre'],$f['anio'],$f['semana'],$f['porcentaje'],$f['totalHoras'])) {
+                    $errors[] = "Fila {$idx}: datos incompletos";
+                    continue;
+                }
+
+                // Verificar duplicado
+                $stmtVerify->execute([':a'=>$f['anio'],':s'=>$f['semana'],':cp'=>$f['codPdre'],':pr'=>$f['proceso']]);
+                if ($stmtVerify->fetchColumn() > 0) {
+                    $skipped[] = "Sem {$f['semana']}/{$f['anio']} ya existe para {$f['proceso']}";
+                    continue;
+                }
+
+                $ok = $stmtInsert->execute([
+                    ':ot'=>$f['idPadreOT'], ':cy'=>$f['proyecto'], ':pr'=>$f['proceso'], ':cp'=>$f['codPdre'],
+                    ':a'=>$f['anio'], ':s'=>$f['semana'], ':av'=>$f['porcentaje'], ':th'=>$f['totalHoras'],
+                    ':fab'=>$f['fabricacion'] ?? 'tama'
+                ]);
+
+                if ($ok && $stmtInsert->rowCount() > 0) {
+                    $idProg = $pdo->lastInsertId();
+                    $inserted[] = ['index'=>$idx,'IdPrograma'=>$idProg,'anio'=>$f['anio'],'semana'=>$f['semana'],'proyecto'=>$f['proyecto'],'proceso'=>$f['proceso']];
+                } else {
+                    $errors[] = "Fila {$idx}: no se insertó";
+                }
+            }
+
+            // Crear BASELINE automático para procesos nuevos
+            foreach ($processes as $key => $d) {
+                if (!empty($baselineExists[$key])) continue;
+
+                $stmtSelProg->execute([':ot'=>$d['idPadreOT'],':cy'=>$d['proyecto'],':pr'=>$d['proceso'],':cp'=>$d['codPdre']]);
+                $rows = $stmtSelProg->fetchAll();
+                foreach ($rows as $r) {
+                    try {
+                        $stmtInsBL->execute([
+                            ':id'=>$r['IdPrograma'],':a'=>$r['Aniio'],':s'=>$r['Semana'],
+                            ':av'=>$r['Avance'],':th'=>$r['TotHoras'],
+                            ':ot'=>$d['idPadreOT'],':cy'=>$d['proyecto'],':pr'=>$d['proceso'],':cp'=>$d['codPdre']
+                        ]);
+                    } catch (Exception $exBL) {
+                        // No bloquear por error de baseline
+                    }
+                }
+            }
+
+            $pdo->commit();
+
+            return [
+                'success'  => count($inserted) > 0,
+                'message'  => count($inserted) . ' registro(s) insertados',
+                'inserted' => $inserted,
+                'skipped'  => $skipped,
+                'errors'   => $errors
+            ];
+
+        } catch (Exception $e) {
+            try { $pdo->rollBack(); } catch (Exception $__) {}
+            return ['success'=>false,'message'=>'Error: '.$e->getMessage(),'errors'=>[$e->getMessage()]];
+        }
+    }
+
+    /* ════════════════════════════════════════════
+       7. Eliminar programación
+       Origen: consultasAjax1/consulta4.php
+       ════════════════════════════════════════════ */
+    public static function eliminarProgramacion(int $idPrograma): array {
+        $pdo  = ConexionLocal::conectar();
+        $stmt = $pdo->prepare("DELETE FROM programadorsem WHERE IdPrograma = :id");
+        $stmt->execute([':id' => $idPrograma]);
+
+        if ($stmt->rowCount() > 0) {
+            return ['success'=>true,'message'=>'Registro eliminado'];
+        }
+        return ['success'=>false,'message'=>'No se encontró registro ID '.$idPrograma];
+    }
+
+    /* ════════════════════════════════════════════
+       8. Actualizar campo individual
+       Origen: consultasAjax1/consulta5.php
+       ════════════════════════════════════════════ */
+    private static $CAMPOS_PERMITIDOS = ['Avance','AvanceReal','Semana','Aniio','Estado','Fabricacion','TotHoras'];
+
+    public static function actualizarCampo(int $idPrograma, string $field, $newValue): array {
+        if (!in_array($field, self::$CAMPOS_PERMITIDOS, true)) {
+            return ['success'=>false,'message'=>'Campo no permitido: '.$field];
+        }
+
+        $pdo = ConexionLocal::conectar();
+
+        // Manejo especial para Semana: también actualizar registroconsumibles
+        if ($field === 'Semana') {
+            $stmtProg = $pdo->prepare("SELECT otpadre, CodPdre, CodProceso, Semana FROM programadorsem WHERE IdPrograma = :id LIMIT 1");
+            $stmtProg->execute([':id' => $idPrograma]);
+            $progRow = $stmtProg->fetch();
+
+            if (!$progRow) return ['success'=>false,'message'=>'Registro no encontrado'];
+
+            // Actualizar programadorsem
+            $pdo->prepare("UPDATE programadorsem SET Semana = :v WHERE IdPrograma = :id")
+                ->execute([':v'=>$newValue,':id'=>$idPrograma]);
+
+            // Actualizar registroconsumibles si tiene columna semana
+            try {
+                $colCheck = $pdo->query("SHOW COLUMNS FROM registroconsumibles LIKE 'semana'");
+                if ($colCheck && $colCheck->rowCount() > 0) {
+                    $pdo->prepare("UPDATE registroconsumibles SET semana = :v WHERE otpadreCon = :ot AND codpadre = :cp AND Proceso = :pr AND semana = :old")
+                        ->execute([':v'=>$newValue,':ot'=>$progRow['otpadre'],':cp'=>$progRow['CodPdre'],':pr'=>$progRow['CodProceso'],':old'=>$progRow['Semana']]);
+                }
+            } catch (Exception $e) { /* no bloquear */ }
+
+            return ['success'=>true];
+        }
+
+        // Actualización genérica
+        $stmt = $pdo->prepare("UPDATE programadorsem SET `{$field}` = :v WHERE IdPrograma = :id");
+        $stmt->execute([':v'=>$newValue,':id'=>$idPrograma]);
+
+        return ['success' => $stmt->rowCount() > 0 || true]; // el valor puede no cambiar
+    }
+
+    /* ════════════════════════════════════════════
+       9. Actualizar TotHoras
+       Origen: consultasAjax1/consulta6.php
+       ════════════════════════════════════════════ */
+    public static function actualizarHoras(int $idPrograma, $totalHoras): array {
+        $pdo  = ConexionLocal::conectar();
+        $stmt = $pdo->prepare("UPDATE programadorsem SET TotHoras = :th WHERE IdPrograma = :id");
+        $stmt->execute([':th'=>$totalHoras,':id'=>$idPrograma]);
+        return ['success'=>true,'message'=>'TotHoras actualizado'];
+    }
+}

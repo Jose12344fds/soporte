@@ -1,0 +1,160 @@
+<?php
+declare(strict_types=1);
+
+ob_start();
+error_reporting(0);
+ini_set('display_errors', '0');
+header('Content-Type: application/json; charset=utf-8');
+
+require_once dirname(dirname(__DIR__)) . '/includes/load.php';
+require_once dirname(dirname(__DIR__)) . '/config/app.php';
+require_once __DIR__ . '/conexion_hana.php';
+
+function equipo_imagen_out(array $data, int $status = 200): void {
+    while (ob_get_level()) { ob_end_clean(); }
+    http_response_code($status);
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
+
+function equipo_imagen_table(): bool {
+    global $db;
+    $result = $db->query("SHOW TABLES LIKE 'mantenimientos_equipo_imagenes'");
+    if ($db->num_rows($result) > 0) return true;
+    $sql = file_get_contents(dirname(dirname(__DIR__)) . '/sql/07_mantenimientos_equipo_imagenes.sql');
+    if (!is_string($sql) || trim($sql) === '') return false;
+    $db->query($sql);
+    $result = $db->query("SHOW TABLES LIKE 'mantenimientos_equipo_imagenes'");
+    return $db->num_rows($result) > 0;
+}
+
+function equipo_imagen_root(): string {
+    return dirname(dirname(__DIR__)) . DIRECTORY_SEPARATOR . 'storage'
+        . DIRECTORY_SEPARATOR . 'mantenimientos' . DIRECTORY_SEPARATOR . 'equipos';
+}
+
+function equipo_imagen_code($value): string {
+    $code = trim((string)$value);
+    if ($code === '' || mb_strlen($code) > 50 || !preg_match('/^[A-Za-z0-9._-]+$/', $code)) {
+        equipo_imagen_out(['error' => 'Codigo SAP del equipo invalido.'], 400);
+    }
+    return $code;
+}
+
+function equipo_imagen_unlink(string $relativePath): void {
+    $root = equipo_imagen_root();
+    $path = $root . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
+    $rootReal = realpath($root);
+    $pathReal = realpath($path);
+    if ($rootReal && $pathReal && str_starts_with($pathReal, $rootReal . DIRECTORY_SEPARATOR)) {
+        @unlink($pathReal);
+    }
+}
+
+if (!$session->isUserLoggedIn(false)) equipo_imagen_out(['error' => 'No autorizado.'], 401);
+if (!equipo_imagen_table()) equipo_imagen_out(['error' => 'No se pudo preparar la tabla de imagenes.'], 503);
+
+$method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+global $db;
+
+try {
+    if ($method === 'GET') {
+        if (!tiene_permiso('mantenimientos', 'ver')) equipo_imagen_out(['error' => 'Sin permiso.'], 403);
+        $code = equipo_imagen_code($_GET['code'] ?? '');
+        $result = $db->query(
+            "SELECT id,sap_equipo_code,item_code,nombre_original,mime_type,tamano_bytes,created_at,updated_at"
+            . " FROM mantenimientos_equipo_imagenes WHERE sap_equipo_code='" . $db->escape($code) . "' LIMIT 1"
+        );
+        $row = $db->fetch_assoc($result);
+        if ($row) {
+            $row['id'] = (int)$row['id'];
+            $row['tamano_bytes'] = (int)$row['tamano_bytes'];
+            $row['url'] = rtrim(BASE_URL, '/') . '/api/mantenimientos/ver_imagen_equipo.php?id=' . $row['id'];
+        }
+        equipo_imagen_out(['success' => true, 'imagen' => $row ?: null]);
+    }
+
+    if ($method === 'DELETE') {
+        if (!tiene_permiso('mantenimientos', 'editar')) equipo_imagen_out(['error' => 'Sin permiso.'], 403);
+        $input = json_decode((string)file_get_contents('php://input'), true) ?: [];
+        $code = equipo_imagen_code($input['code'] ?? '');
+        $result = $db->query(
+            "SELECT id,ruta_relativa FROM mantenimientos_equipo_imagenes"
+            . " WHERE sap_equipo_code='" . $db->escape($code) . "' LIMIT 1"
+        );
+        $row = $db->fetch_assoc($result);
+        if (!$row) equipo_imagen_out(['error' => 'El equipo no tiene una imagen.'], 404);
+        $db->query('DELETE FROM mantenimientos_equipo_imagenes WHERE id=' . (int)$row['id'] . ' LIMIT 1');
+        equipo_imagen_unlink((string)$row['ruta_relativa']);
+        equipo_imagen_out(['success' => true]);
+    }
+
+    if ($method !== 'POST') equipo_imagen_out(['error' => 'Metodo no permitido.'], 405);
+    if (!tiene_permiso('mantenimientos', 'crear') && !tiene_permiso('mantenimientos', 'editar')) {
+        equipo_imagen_out(['error' => 'Sin permiso para cargar imagenes.'], 403);
+    }
+
+    $code = equipo_imagen_code($_POST['code'] ?? '');
+    $itemCode = mb_substr(trim((string)($_POST['itemcode'] ?? '')), 0, 100);
+    if (!isset($_FILES['imagen'])) equipo_imagen_out(['error' => 'Seleccione una imagen.'], 400);
+    $file = $_FILES['imagen'];
+    if ((int)($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        equipo_imagen_out(['error' => 'La imagen no pudo cargarse. Codigo: ' . (int)$file['error']], 400);
+    }
+
+    $pdo = getHanaPdo();
+    $stmt = $pdo->prepare('SELECT "Code","Name" FROM "SBO_TAMAING_PRODUC"."@TAMA_EQUIPOS_TM" WHERE "Code" = ?');
+    $stmt->execute([$code]);
+    if (!$stmt->fetch()) equipo_imagen_out(['error' => 'El equipo indicado no existe en SAP.'], 404);
+
+    $size = (int)($file['size'] ?? 0);
+    if ($size <= 0 || $size > 15 * 1024 * 1024) {
+        equipo_imagen_out(['error' => 'La imagen debe pesar como maximo 15 MB.'], 400);
+    }
+    $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file((string)$file['tmp_name']);
+    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+    if (!isset($allowed[$mime])) equipo_imagen_out(['error' => 'Use una imagen JPG, PNG o WEBP.'], 400);
+
+    $relativeDir = date('Y/m') . '/equipo_' . $code;
+    $targetDir = equipo_imagen_root() . DIRECTORY_SEPARATOR
+        . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
+    if (!is_dir($targetDir) && !mkdir($targetDir, 0750, true) && !is_dir($targetDir)) {
+        throw new RuntimeException('No se pudo crear la carpeta de imagenes.');
+    }
+    $storedName = bin2hex(random_bytes(16)) . '.' . $allowed[$mime];
+    $target = $targetDir . DIRECTORY_SEPARATOR . $storedName;
+    if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
+        throw new RuntimeException('No se pudo guardar la imagen en el servidor.');
+    }
+    $relativePath = $relativeDir . '/' . $storedName;
+
+    $oldResult = $db->query(
+        "SELECT ruta_relativa FROM mantenimientos_equipo_imagenes"
+        . " WHERE sap_equipo_code='" . $db->escape($code) . "' LIMIT 1"
+    );
+    $old = $db->fetch_assoc($oldResult);
+    $user = current_user();
+    $userId = (int)($user['id'] ?? 0);
+    $sql = "INSERT INTO mantenimientos_equipo_imagenes"
+        . " (sap_equipo_code,item_code,nombre_original,nombre_archivo,ruta_relativa,mime_type,tamano_bytes,user_id) VALUES ("
+        . "'" . $db->escape($code) . "',"
+        . ($itemCode === '' ? 'NULL' : "'" . $db->escape($itemCode) . "'") . ","
+        . "'" . $db->escape(mb_substr(basename((string)$file['name']), 0, 255)) . "',"
+        . "'" . $db->escape($storedName) . "','" . $db->escape($relativePath) . "',"
+        . "'" . $db->escape($mime) . "'," . $size . ',' . ($userId > 0 ? $userId : 'NULL') . ")"
+        . " ON DUPLICATE KEY UPDATE item_code=VALUES(item_code),nombre_original=VALUES(nombre_original),"
+        . " nombre_archivo=VALUES(nombre_archivo),ruta_relativa=VALUES(ruta_relativa),mime_type=VALUES(mime_type),"
+        . " tamano_bytes=VALUES(tamano_bytes),user_id=VALUES(user_id),updated_at=CURRENT_TIMESTAMP";
+    try {
+        $db->query($sql);
+    } catch (Throwable $dbError) {
+        @unlink($target);
+        throw $dbError;
+    }
+    if ($old && !empty($old['ruta_relativa']) && $old['ruta_relativa'] !== $relativePath) {
+        equipo_imagen_unlink((string)$old['ruta_relativa']);
+    }
+    equipo_imagen_out(['success' => true, 'message' => 'Imagen del equipo guardada.'], 201);
+} catch (Throwable $e) {
+    equipo_imagen_out(['error' => 'No se pudo procesar la imagen del equipo.'], 500);
+}

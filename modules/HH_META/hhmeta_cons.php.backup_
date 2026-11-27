@@ -1,0 +1,1486 @@
+﻿<?php
+$page_title = 'Proyectos SAP HANA - Consulta PCP';
+require_once dirname(dirname(__DIR__)) . '/includes/load.php';
+require_permiso('hh-meta', 'ver');
+
+// Catálogo de horas meta para distribución automática (tabla calculohoras)
+$calculoHorasCatalog = [];
+$rawCalculoHoras = find_by_sql("SELECT Tipo, MO001, MO002, MO004, MO014, MO008, MO007, MO003, MO015, MO005, MO009, MO004P, MO006, MO012, MO011, MO020, MO010 FROM calculohoras");
+foreach ($rawCalculoHoras as $row) {
+    $tipoKey = strtoupper(trim($row['Tipo'] ?? ''));
+    if ($tipoKey === '' || isset($calculoHorasCatalog[$tipoKey])) continue;
+    $calculoHorasCatalog[$tipoKey] = [
+        'MO001' => (float)($row['MO001'] ?? 0), 'MO002' => (float)($row['MO002'] ?? 0),
+        'MO004' => (float)($row['MO004'] ?? 0), 'MO014' => (float)($row['MO014'] ?? 0),
+        'MO008' => (float)($row['MO008'] ?? 0), 'MO007' => (float)($row['MO007'] ?? 0),
+        'MO003' => (float)($row['MO003'] ?? 0), 'MO015' => (float)($row['MO015'] ?? 0),
+        'MO005' => (float)($row['MO005'] ?? 0), 'MO009' => (float)($row['MO009'] ?? 0),
+        'MO004P' => (float)($row['MO004P'] ?? 0), 'MO006' => (float)($row['MO006'] ?? 0),
+        'MO012' => (float)($row['MO012'] ?? 0), 'MO011' => (float)($row['MO011'] ?? 0),
+        'MO020' => (float)($row['MO020'] ?? 0), 'MO010' => (float)($row['MO010'] ?? 0),
+    ];
+}
+// ID para la tabla otpadre (siguiente correlativo)
+$all_countOTPADRE = CountVariabel();
+$numValue = $all_countOTPADRE[0]['NUM'];
+
+include_once dirname(dirname(__DIR__)) . '/layouts/header.php';
+?>
+
+<link rel="stylesheet" href="../../assets/css/hhmeta.css">
+<link rel="stylesheet" href="../../assets/css/hhmeta_cons_api.css">
+
+<!-- Configuración de distribución por tipo (calculohoras) -->
+<script>
+window.calculoHorasConfig = <?php echo json_encode($calculoHorasCatalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+window.numValuePE = <?php echo json_encode($numValue + 1); ?>;
+</script>
+
+<div class="container-fluid" style="max-width: 1400px;">
+
+  <!-- Buscador -->
+  <div class="hero-search">
+    <h4><i class="fas fa-industry"></i> Consulta de Proyectos PCP</h4>
+    <p>Busca por código OT o usa el selector para explorar todos los proyectos SAP HANA</p>
+    <div class="search-row">
+      <input type="text" id="inputOT" placeholder="Código OT completo o solo el número, ej: 4720" autofocus>
+      <button class="btn-hero btn-hero-primary" id="btnBuscar"><i class="fas fa-search"></i> Buscar</button>
+      <button class="btn-hero btn-hero-outline" id="btnVerTodos"><i class="fas fa-th-list"></i> Ver Todos</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="statsRow" style="display:none;">
+    <div class="stat-card">
+      <div class="stat-icon blue"><i class="fas fa-clipboard-list"></i></div>
+      <div><div class="stat-number" id="statOT">—</div><div class="stat-label">Código OT</div></div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-icon green"><i class="fas fa-boxes"></i></div>
+      <div><div class="stat-number" id="statItems">0</div><div class="stat-label">Items Encontrados</div></div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-icon amber"><i class="fas fa-user-tie"></i></div>
+      <div><div class="stat-number" id="statCliente" style="font-size:14px;">—</div><div class="stat-label">Cliente</div></div>
+    </div>
+  </div>
+
+  <!-- Panel de Items -->
+  <div class="card-panel">
+    <div class="card-panel-header">
+      <h5><i class="fas fa-table"></i> Detalle de Orden de Trabajo</h5>
+      <span class="badge-count" id="badgeCount">0 registros</span>
+    </div>
+    <div class="card-panel-body">
+      <div id="alertBar" style="display:none;" class="alert-info-bar"></div>
+      <div id="emptyState" class="empty-box">
+        <i class="fas fa-search"></i>
+        <p>Busca o selecciona una OT para ver sus items</p>
+      </div>
+      <div id="loadingState" style="display:none;" class="loading-box">
+        <i class="fas fa-circle-notch fa-spin spinner"></i>
+        <p style="color:#858796; margin-top:10px;">Consultando SAP HANA...</p>
+      </div>
+      <div id="tableWrapper" style="display:none;">
+        <div class="table-responsive">
+          <table class="table table-hover" id="tblItems">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>OT</th>
+                <th>Cliente</th>
+                <th>Proyecto</th>
+                <th>Cód. Producto</th>
+                <th>Descripción</th>
+                <th>Plano</th>
+                <th>Tipo</th>
+                <th>N° OF</th>
+                <th>Item</th>
+                <th>Cant.</th>
+                <th>HH Fab</th>
+                <th>Peso Ppto (Kg)</th>
+                <th>Peso Neto (Kg)</th>
+              </tr>
+            </thead>
+            <tbody id="tblItemsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Panel Detalle de Item (Master-Detail) ═══ -->
+<div id="detailPanel">
+  <div class="detail-nav">
+    <div class="nav-info">
+      <span class="nav-badge" id="detailCounter">0 / 0</span>
+      <div>
+        <div class="nav-title" id="detailTitle">—</div>
+        <div class="nav-sub" id="detailSub">Selecciona un item para ver su desglose</div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button type="button" id="btnFuenteHistorico" class="btn btn-sm btn-light" title="Ver detalle desde histórico">Histórico</button>
+      <button type="button" id="btnFuenteSap" class="btn btn-sm btn-light" title="Ver detalle desde SAP por OITT">SAP por OITT</button>
+      <button id="btnPrevItem" title="Item anterior (↑)" disabled><i class="fas fa-chevron-up"></i></button>
+      <button id="btnNextItem" title="Item siguiente (↓)" disabled><i class="fas fa-chevron-down"></i></button>
+      <button class="btn-close-detail" id="btnCloseDetail" title="Cerrar detalle"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+  <div class="detail-body">
+    <div class="detail-main" id="detailContent">
+      <div class="detail-empty">
+        <i class="fas fa-hand-pointer"></i>
+        <p>Haz clic en una fila de la tabla para ver su desglose</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Acciones: Cargar / Calcular -->
+<div class="step-actions" id="stepActions" style="display:none;">
+  <button class="btn btn-warning btn-sm" id="btnCargarItems" title="Cargar todos los items de la OT a la tabla de edición">
+    <i class="fas fa-download"></i> Cargar Items
+  </button>
+  <button class="btn btn-info btn-sm" id="btnCalcular" title="Calcular horas proporcionales al peso">
+    <i class="fas fa-calculator"></i> Calcular
+  </button>
+  <span class="step-hint"><i class="fas fa-info-circle"></i> Opción A: Cargar todos | Opción B: Agregar uno a uno desde el detalle</span>
+</div>
+
+<!-- Tabla de edición (items seleccionados) -->
+<div id="editTableContainer"></div>
+
+</div>
+
+<!-- Modal Selector de Proyectos -->
+<div class="modal fade" id="modalProyectos" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-project-diagram"></i> Selector de Proyectos SAP</h5>
+        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+      </div>
+      <div class="modal-filter-bar">
+        <i class="fas fa-filter" style="color:var(--secondary);"></i>
+        <input type="text" id="modalSearch" placeholder="Filtrar por código OT o nombre de proyecto...">
+        <button class="btn-clear" id="btnClearFilter"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-stats">
+        <i class="fas fa-database"></i> Mostrando <span class="pill" id="modalCount">0</span> proyectos
+      </div>
+      <div class="modal-body" style="padding: 0 24px 16px; max-height: 450px; overflow-y: auto;">
+        <table class="table table-hover" id="tblModal">
+          <thead>
+            <tr>
+              <th style="width:130px;">Código OT</th>
+              <th>Proyecto</th>
+              <th style="width:110px;">Peso Ppto (Kg)</th>
+              <th style="width:100px;">Peso Neto (Kg)</th>
+              <th style="width:90px;">HH Fab</th>
+            </tr>
+          </thead>
+          <tbody id="tblModalBody">
+            <tr><td colspan="5" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Cargando proyectos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <small class="text-muted mr-auto"><i class="fas fa-hand-pointer"></i> Haz clic en una fila para seleccionar</small>
+        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal"><i class="fas fa-times"></i> Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const API_BASE = '../../api/hhmeta';
+  const SAVE_OTHIJA_URL  = API_BASE + '/json/guardar_othija.php';
+  const SAVE_OTPADRE_URL = API_BASE + '/json/guardar_otpadre.php';
+
+  let todosProyectos = [];
+  let itemsActuales  = [];   // items cargados de la OT actual
+  let currentItemIdx = -1;   // índice del item seleccionado
+  let selectedOT     = '';   // código OT seleccionado actualmente
+  let selectedProyectoNombre = '';
+  let currentDetailSource = 'sap';
+  let numValuePE = window.numValuePE || 1;
+
+  // Distribución por tipo (viene del PHP → window.calculoHorasConfig)
+  const tipoDistribuciones = window.calculoHorasConfig || {};
+  function buildTipoOptions(map) {
+    const keys = Object.keys(map);
+    if (keys.length === 0) return '<option value="">-</option>';
+    let opts = '<option value="">Sel.</option>';
+    keys.forEach(k => { opts += '<option value="' + k + '">' + k + '</option>'; });
+    return opts;
+  }
+  const tipoOptionsHtml = buildTipoOptions(tipoDistribuciones);
+
+  /* ──────── Nombres legibles de procesos ──────── */
+  const PROCESOS = {
+    // HABILITADO
+    MO001:  { nombre: 'Hab. Planchas',  grupo: 'hab' },
+    MO002:  { nombre: 'Hab. Perfiles',  grupo: 'hab' },
+    MO004H: { nombre: 'Limp. Mecánica', grupo: 'hab' },
+    // FABRICACIÓN
+    MO014:  { nombre: 'Rolado',         grupo: 'fab' },
+    MO008:  { nombre: 'Torno',          grupo: 'fab' },
+    MO007:  { nombre: 'CNC',            grupo: 'fab' },
+    MO003:  { nombre: 'Armado',         grupo: 'fab' },
+    MO015:  { nombre: 'Soldeo',         grupo: 'fab' },
+    MO005:  { nombre: 'Plantillado',    grupo: 'fab' },
+    MO009:  { nombre: 'Taladro',        grupo: 'fab' },
+    MO004P: { nombre: 'Limp. Mecánica', grupo: 'fab' },
+    MO006:  { nombre: 'Ensamble',       grupo: 'fab' },
+    // ACABADOS
+    MO012:  { nombre: 'Granallado',     grupo: 'acab' },
+    MO011:  { nombre: 'Pintura',        grupo: 'acab' },
+    MO020:  { nombre: 'Decapado/Pasivado', grupo: 'acab' },
+    // EMBALAJE (dentro de Acabados)
+    MO010:  { nombre: 'Embalaje',       grupo: 'acab' }
+  };
+  const GRUPO_LABEL = {
+    hab:  'Habilitado',
+    fab:  'Fabricación',
+    acab: 'Acabados'
+  };
+
+  document.addEventListener('DOMContentLoaded', init);
+
+  /* ════════════════════════════════════════════════
+     INIT
+  ════════════════════════════════════════════════ */
+  function init() {
+    document.getElementById('btnBuscar').addEventListener('click', () => {
+      const ot = document.getElementById('inputOT').value.trim();
+      if (ot) buscarConNormalizacion(ot);
+    });
+    document.getElementById('inputOT').addEventListener('keypress', e => {
+      if (e.key === 'Enter') {
+        const ot = e.target.value.trim();
+        if (ot) buscarConNormalizacion(ot);
+      }
+    });
+    document.getElementById('btnVerTodos').addEventListener('click', abrirModal);
+    document.getElementById('modalSearch').addEventListener('input', filtrarModal);
+    document.getElementById('btnClearFilter').addEventListener('click', () => {
+      document.getElementById('modalSearch').value = '';
+      renderModalTable(todosProyectos);
+    });
+
+    // Detail panel navigation
+    document.getElementById('btnFuenteHistorico').addEventListener('click', () => cambiarFuenteDetalle('historico'));
+    document.getElementById('btnFuenteSap').addEventListener('click', () => cambiarFuenteDetalle('sap'));
+    document.getElementById('btnPrevItem').addEventListener('click', () => navItem(-1));
+    document.getElementById('btnNextItem').addEventListener('click', () => navItem(1));
+    document.getElementById('btnCloseDetail').addEventListener('click', cerrarDetalle);
+
+    // Keyboard navigation (arrow keys)
+    document.addEventListener('keydown', e => {
+      if (currentItemIdx < 0) return;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); navItem(-1); }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); navItem(1); }
+      if (e.key === 'Escape') cerrarDetalle();
+    });
+
+    // Cargar Items button
+    document.getElementById('btnCargarItems').addEventListener('click', cargarTodosItems);
+    // Calcular button
+    document.getElementById('btnCalcular').addEventListener('click', calcularProporcional);
+
+    cargarProyectos();
+    updateDetalleSourceButtons();
+  }
+
+  /* ════════════════════════════════════════════════
+     PROYECTOS (modal)
+  ════════════════════════════════════════════════ */
+  async function cargarProyectos() {
+    try {
+      const res = await fetch(API_BASE + '/get_proyectos.php');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      todosProyectos = Array.isArray(data) ? data : [];
+      renderModalTable(todosProyectos);
+    } catch (err) {
+      console.error('Error cargando proyectos:', err);
+      document.getElementById('tblModalBody').innerHTML =
+        '<tr><td colspan="5" class="text-center text-danger py-3"><i class="fas fa-exclamation-triangle"></i> ' + esc(err.message) + '</td></tr>';
+    }
+  }
+
+  function abrirModal() {
+    document.getElementById('modalSearch').value = '';
+    renderModalTable(todosProyectos);
+    $('#modalProyectos').modal('show');
+    setTimeout(() => document.getElementById('modalSearch').focus(), 300);
+  }
+
+  function renderModalTable(proyectos) {
+    const tbody = document.getElementById('tblModalBody');
+    document.getElementById('modalCount').textContent = proyectos.length;
+    if (proyectos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No se encontraron proyectos</td></tr>';
+      return;
+    }
+    let html = '';
+    proyectos.forEach(p => {
+      const hh = parseFloat(p.HHFab) || 0;
+      const isHigh = hh > 300;
+      html += '<tr class="' + (isHigh ? 'row-highlight' : '') + '" data-ot="' + esc(p.OT) + '">' +
+        '<td><strong>' + esc(p.OT) + '</strong></td>' +
+        '<td>' + esc(p.Proyecto1) + '</td>' +
+        '<td class="td-number">' + num(p.TotalPesPptoTotaKg) + '</td>' +
+        '<td class="td-number">' + num(p.PeNetTotKg) + '</td>' +
+        '<td class="td-number">' + num(p.HHFab) + (isHigh ? ' <span class="badge-hh high">+300</span>' : '') + '</td>' +
+        '</tr>';
+    });
+    tbody.innerHTML = html;
+    tbody.querySelectorAll('tr[data-ot]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const ot = tr.getAttribute('data-ot');
+        $('#modalProyectos').modal('hide');
+        document.getElementById('inputOT').value = ot;
+        cargarItems(ot);
+      });
+    });
+  }
+
+  function filtrarModal() {
+    const term = document.getElementById('modalSearch').value.toLowerCase().trim();
+    if (!term) { renderModalTable(todosProyectos); return; }
+    const filtered = todosProyectos.filter(p =>
+      p.OT.toLowerCase().includes(term) || (p.Proyecto1 && p.Proyecto1.toLowerCase().includes(term))
+    );
+    renderModalTable(filtered);
+  }
+
+  /* ════════════════════════════════════════════════
+     BÚSQUEDA INTELIGENTE — resuelve número → OT completa
+  ════════════════════════════════════════════════ */
+  function buscarConNormalizacion(input) {
+    // Si ya tiene letras o guión, usar directo (ej: OTC-004720)
+    if (/[a-zA-Z]/.test(input) || input.includes('-')) {
+      cargarItems(input.toUpperCase());
+      return;
+    }
+    // Solo números → buscar en la lista cargada
+    const numLimpio = input.replace(/^0+/, ''); // quitar ceros a la izquierda
+    const coincidencias = todosProyectos.filter(p => {
+      if (!p.OT) return false;
+      const soloNum = p.OT.replace(/\D/g, '').replace(/^0+/, '');
+      return soloNum === numLimpio || soloNum.endsWith(numLimpio);
+    });
+    if (coincidencias.length === 1) {
+      // Encontrado exactamente uno → cargar directo
+      const otResuelta = coincidencias[0].OT;
+      document.getElementById('inputOT').value = otResuelta;
+      cargarItems(otResuelta);
+    } else if (coincidencias.length > 1) {
+      // Varias coincidencias → abrir modal ya filtrado
+      document.getElementById('modalSearch').value = input;
+      renderModalTable(coincidencias);
+      $('#modalProyectos').modal('show');
+      setTimeout(() => document.getElementById('modalSearch').focus(), 300);
+    } else {
+      // Sin coincidencias en lista local → intentar formato OTC-XXXXXX
+      const otFallback = 'OTC-' + numLimpio.padStart(6, '0');
+      cargarItems(otFallback);
+    }
+  }
+
+  /* ════════════════════════════════════════════════
+     ITEMS de OT  (tabla principal)
+  ════════════════════════════════════════════════ */
+  async function cargarItems(ot) {
+    showLoading();
+    cerrarDetalle();
+    selectedOT = ot;
+    selectedRowsByItem = {};  // limpiar tabla de edición al cambiar OT
+    renderEditTable();
+    try {
+      const res = await fetch(API_BASE + '/get_items_ot.php?ot=' + encodeURIComponent(ot));
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Response body:', text);
+        throw new Error('Error del servidor (HTTP ' + res.status + ')');
+      }
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const items = Array.isArray(data) ? data : [];
+      if (items.length === 0) {
+        showAlert('No se encontraron items para <strong>' + esc(ot) + '</strong>', 'error');
+        showEmpty();
+        return;
+      }
+      itemsActuales = items;
+      renderItems(items, ot);
+    } catch (err) {
+      console.error('Error cargando items:', err);
+      showAlert('<i class="fas fa-exclamation-triangle"></i> ' + err.message, 'error');
+      showEmpty();
+    }
+  }
+
+  function renderItems(items, ot) {
+    const tbody = document.getElementById('tblItemsBody');
+    let html = '';
+    let totalHH = 0, totalPeso = 0, totalNeto = 0;
+    items.forEach((item, i) => {
+      const hh = parseFloat(item.HHFab) || 0;
+      const peso = parseFloat(item.PesPptoTotaKg) || 0;
+      const neto = parseFloat(item.PeNetTotKg) || 0;
+      totalHH += hh; totalPeso += peso; totalNeto += neto;
+      html += '<tr data-idx="' + i + '" style="cursor:pointer;" title="Clic para ver detalle de procesos">' +
+        '<td style="color:#aaa;">' + (i + 1) + '</td>' +
+        '<td><strong>' + esc(item.OT) + '</strong></td>' +
+        '<td>' + esc(item.Cliente) + '</td>' +
+        '<td>' + esc(item.Proyecto11) + '</td>' +
+        '<td><code>' + esc(item.Cdigproducto) + '</code></td>' +
+        '<td>' + esc(item.Descripci) + '</td>' +
+        '<td>' + esc(item.PlanodelclienteTAMA) + '</td>' +
+        '<td><span class="td-badge" style="background:#e8eaf6;color:var(--primary);">' + esc(item.Tipoproyecto) + '</span></td>' +
+        '<td class="td-number">' + esc(item.NumOF) + '</td>' +
+        '<td class="td-number">' + esc(item.ItemOT) + '</td>' +
+        '<td class="td-number">' + num(item.Cantd) + '</td>' +
+        '<td class="td-number">' + num(item.HHFab) + '</td>' +
+        '<td class="td-number">' + num(item.PesPptoTotaKg) + '</td>' +
+        '<td class="td-number">' + num(item.PeNetTotKg) + '</td>' +
+        '</tr>';
+    });
+    html += '<tr style="background:#f8f9fc; font-weight:700; border-top:2px solid var(--primary);">' +
+      '<td colspan="11" style="text-align:right; color:var(--primary);">TOTALES</td>' +
+      '<td class="td-number">' + totalHH.toLocaleString('es-CL', {maximumFractionDigits:1}) + '</td>' +
+      '<td class="td-number">' + totalPeso.toLocaleString('es-CL', {maximumFractionDigits:1}) + '</td>' +
+      '<td class="td-number">' + totalNeto.toLocaleString('es-CL', {maximumFractionDigits:1}) + '</td>' +
+      '</tr>';
+    tbody.innerHTML = html;
+
+    // Click en fila → abrir detalle
+    tbody.querySelectorAll('tr[data-idx]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const idx = parseInt(tr.getAttribute('data-idx'), 10);
+        seleccionarItem(idx);
+      });
+    });
+
+    const cliente = items[0].Cliente || '—';
+    selectedProyectoNombre = items[0].Proyecto11 || '';
+    document.getElementById('statOT').textContent = ot;
+    document.getElementById('statItems').textContent = items.length;
+    document.getElementById('statCliente').textContent = cliente;
+    document.getElementById('statsRow').style.display = 'flex';
+    document.getElementById('stepActions').style.display = 'flex';
+    document.getElementById('badgeCount').textContent = items.length + ' registro' + (items.length !== 1 ? 's' : '');
+    showAlert('<i class="fas fa-check-circle"></i> <strong>' + esc(ot) + '</strong> — ' + esc(cliente) + ' | ' + items.length + ' items cargados. <em>Haz clic en una fila para ver el desglose.</em>', 'success');
+    showTable();
+  }
+
+  /* ════════════════════════════════════════════════
+     DETAIL PANEL (navegación por item)
+  ════════════════════════════════════════════════ */
+  let selectedRowsByItem = {};  // { codProducto: rowData } items seleccionados con radio
+
+  function seleccionarItem(idx) {
+    if (idx < 0 || idx >= itemsActuales.length) return;
+    currentItemIdx = idx;
+    const item = itemsActuales[idx];
+
+    // Highlight row in tblItems
+    document.querySelectorAll('#tblItemsBody tr[data-idx]').forEach(tr => {
+      tr.style.background = parseInt(tr.getAttribute('data-idx'), 10) === idx ? '#eef0fb' : '';
+    });
+
+    // Update nav header
+    document.getElementById('detailCounter').textContent = (idx + 1) + ' / ' + itemsActuales.length;
+    document.getElementById('detailTitle').textContent = esc(item.Cdigproducto) + ' — ' + esc(item.Descripci);
+    document.getElementById('detailSub').textContent = 'Item ' + (item.ItemOT || idx + 1) + ' | OT ' + item.OT;
+    document.getElementById('btnPrevItem').disabled = (idx === 0);
+    document.getElementById('btnNextItem').disabled = (idx === itemsActuales.length - 1);
+
+    // Show panel (first time)
+    const panel = document.getElementById('detailPanel');
+    if (panel.style.display === 'none') {
+      panel.style.display = 'block';
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    updateDetalleSourceButtons();
+
+    // Scroll detail main to top
+    document.getElementById('detailContent').scrollTop = 0;
+
+    // Load detail
+    cargarDetalleItem(item);
+  }
+
+  function navItem(dir) {
+    let next = currentItemIdx + dir;
+    if (next >= 0 && next < itemsActuales.length) {
+      seleccionarItem(next);
+    }
+  }
+
+  function cerrarDetalle() {
+    document.getElementById('detailPanel').style.display = 'none';
+    currentItemIdx = -1;
+    document.querySelectorAll('#tblItemsBody tr[data-idx]').forEach(tr => { tr.style.background = ''; });
+    updateDetalleSourceButtons();
+  }
+
+  function getYearFromItem(item) {
+    const raw = item.FechaIngreOC || item.FecReqCli || item.Fecha_Terminada || '';
+    const match = String(raw).match(/(\d{4})/);
+    return match ? parseInt(match[1], 10) : new Date().getFullYear();
+  }
+
+  function updateDetalleSourceButtons() {
+    const btnHist = document.getElementById('btnFuenteHistorico');
+    const btnSap = document.getElementById('btnFuenteSap');
+    if (!btnHist || !btnSap) return;
+
+    const activeStyle = 'btn btn-sm btn-primary';
+    const idleStyle = 'btn btn-sm btn-light';
+    btnHist.className = currentDetailSource === 'historico' ? activeStyle : idleStyle;
+    btnSap.className = currentDetailSource === 'sap' ? activeStyle : idleStyle;
+  }
+
+  function cambiarFuenteDetalle(source) {
+    currentDetailSource = source === 'sap' ? 'sap' : 'historico';
+    updateDetalleSourceButtons();
+    if (currentItemIdx >= 0 && itemsActuales[currentItemIdx]) {
+      cargarDetalleItem(itemsActuales[currentItemIdx]);
+    }
+  }
+
+  function normalizeSapProcesosRows(procesos, item) {
+    if (!Array.isArray(procesos) || procesos.length === 0) return [];
+
+    const row = {
+      Year: getYearFromItem(item),
+      ProjectCode: item.OT || selectedOT || '',
+      PlannedParentQuantity: item.Cantd || 0,
+      HHFab: item.HHFab || 0,
+      PesPptoTotaKg: item.PesPptoTotaKg || 0,
+      PeSoldaduraKg: item.PeSoldaduraKg || 0,
+      RendihtoPpto: item.RendihtoPpto || 0,
+      _source: 'sap_bom'
+    };
+
+    ['MO001','MO002','MO004H','MO014','MO008','MO007','MO003','MO015','MO005','MO009','MO004P','MO006','MO012','MO011','MO020','MO010']
+      .forEach(code => { row[code] = 0; });
+
+    procesos.forEach(proc => {
+      const code = String(proc.Code || '').trim().toUpperCase();
+      const quantity = parseFloat(proc.Quantity) || 0;
+
+      if (code === 'MO004') {
+        const stageId = String(proc.StageId || '').trim();
+        const stageNum = parseInt(stageId, 10);
+        const target = stageNum === 1 ? 'MO004H' : 'MO004P';
+        row[target] += quantity;
+        return;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(row, code)) {
+        row[code] += quantity;
+      }
+    });
+
+    return [row];
+  }
+
+  async function fetchDetalleFromSAP(item) {
+    const codProducto = item.Cdigproducto;
+    const sapRes = await fetch(API_BASE + '/get_recursos_sap.php?itemCode=' + encodeURIComponent(codProducto));
+    if (!sapRes.ok) throw new Error('HTTP ' + sapRes.status);
+    const sapData = await sapRes.json();
+    if (sapData.error) throw new Error(sapData.error);
+    return normalizeSapProcesosRows(Array.isArray(sapData) ? sapData : [], item);
+  }
+
+  async function fetchDetalleFromHistorico(item) {
+    const codProducto = item.Cdigproducto;
+    const histRes = await fetch(API_BASE + '/get_detalle_item.php?codProducto=' + encodeURIComponent(codProducto));
+    if (!histRes.ok) throw new Error('HTTP ' + histRes.status);
+    const histData = await histRes.json();
+    if (histData.error) throw new Error(histData.error);
+    return Array.isArray(histData) ? histData : [];
+  }
+
+  async function fetchDetalleRows(item) {
+    const mode = currentDetailSource;
+
+    if (mode === 'sap') {
+      return {
+        rows: await fetchDetalleFromSAP(item),
+        sourceLabel: 'SAP por OITT'
+      };
+    }
+
+    return {
+      rows: await fetchDetalleFromHistorico(item),
+      sourceLabel: 'Histórico'
+    };
+  }
+
+  async function cargarDetalleItem(item) {
+    const content = document.getElementById('detailContent');
+    content.innerHTML = '<div class="detail-loading"><i class="fas fa-circle-notch fa-spin spinner"></i><p style="color:#858796;margin-top:10px;">Consultando detalle de procesos...</p></div>';
+
+    const codProducto = item.Cdigproducto;
+    if (!codProducto) {
+      content.innerHTML = '<div class="detail-empty"><i class="fas fa-exclamation-circle"></i><p>Este item no tiene Código de Producto</p></div>';
+      return;
+    }
+
+    try {
+      const detalle = await fetchDetalleRows(item);
+      const rows = detalle.rows;
+
+      if (rows.length === 0) {
+        content.innerHTML = '<div class="detail-empty"><i class="fas fa-inbox"></i><p>No se encontró desglose de procesos para <strong>' + esc(codProducto) + '</strong></p></div>';
+        return;
+      }
+      renderDetalle(rows, item, detalle.sourceLabel);
+    } catch (err) {
+      console.error('Error detalle:', err);
+      content.innerHTML = '<div class="detail-empty" style="color:var(--danger);"><i class="fas fa-exclamation-triangle"></i><p>' + err.message + '</p></div>';
+    }
+  }
+
+  function renderDetalle(rows, item, sourceLabel) {
+    const content = document.getElementById('detailContent');
+    const codProd = item.Cdigproducto || '';
+
+    // Códigos de procesos en orden de columna (MO010 ahora en Acabados, sin grupo Despacho)
+    const COL_HAB  = ['MO001','MO002','MO004H'];
+    const COL_FAB  = ['MO014','MO008','MO007','MO003','MO015','MO005','MO009','MO004P','MO006'];
+    const COL_ACAB = ['MO012','MO011','MO020','MO010'];
+    const ALL_PROC = [...COL_HAB, ...COL_FAB, ...COL_ACAB];
+
+    let html = '<div style="font-size:11px;color:var(--secondary);margin-bottom:6px;"><i class="fas fa-table"></i> ' + rows.length + ' registro' + (rows.length !== 1 ? 's' : '') + ' — Fuente: <strong>' + esc(sourceLabel || 'Detalle') + '</strong> — Selecciona una fila y presiona <strong>Agregar</strong></div>';
+
+    // ─── Tabla compacta con radio + info + procesos ───
+    html += '<div class="dtbl-wrap">';
+    html += '<table class="dtbl" id="dtblDetalle">';
+
+    // THEAD: fila 1 (grupos) — Sin Cód.Producto ni Descripción; 5 cols info
+    html += '<thead>';
+    html += '<tr>';
+    html += '<th class="th-info" rowspan="2" style="writing-mode:horizontal-tb;height:auto;min-width:36px;"><i class="fas fa-check-circle"></i></th>';
+    html += '<th class="th-info" colspan="5">Información del Item</th>';
+    html += '<th class="th-info" colspan="3">Datos</th>';
+    html += '<th class="th-hab" colspan="' + COL_HAB.length + '">Habilitado</th>';
+    html += '<th class="th-fab" colspan="' + COL_FAB.length + '">Fabricación HH</th>';
+    html += '<th class="th-acab" colspan="' + COL_ACAB.length + '">Acabados HH</th>';
+    html += '<th class="th-total" rowspan="2" style="writing-mode:vertical-rl;height:90px;">TOTAL HH</th>';
+    html += '</tr>';
+
+    // THEAD: fila 2 (sub-columnas) — Sin Cód.Producto ni Descripción
+    html += '<tr>';
+    // Info del item (5 cols)
+    html += '<th class="th-info-sub">Item</th>';
+    html += '<th class="th-info-sub">Cantidad</th>';
+    html += '<th class="th-info-sub">HH Fab</th>';
+    html += '<th class="th-info-sub">Peso Ppto</th>';
+    html += '<th class="th-info-sub">Peso Sold.</th>';
+    // Datos complementarios
+    html += '<th class="th-info-sub">Año</th>';
+    html += '<th class="th-info-sub">Proyecto</th>';
+    html += '<th class="th-info-sub">Rend.</th>';
+    // Process cols (vertical text)
+    ALL_PROC.forEach(code => {
+      html += '<th>' + esc(PROCESOS[code] ? PROCESOS[code].nombre : code) + '</th>';
+    });
+    html += '</tr>';
+    html += '</thead>';
+
+    // TBODY
+    html += '<tbody>';
+    const totals = {};
+    ALL_PROC.forEach(c => { totals[c] = 0; });
+    let grandTotal = 0;
+
+    // Verificar si ya hay una selección previa para este producto
+    const prevSel = selectedRowsByItem[codProd] ? selectedRowsByItem[codProd]._rowIdx : -1;
+
+    rows.forEach((row, ri) => {
+      let rowTotal = 0;
+      const isChecked = (ri === prevSel) || (prevSel < 0 && ri === 0);
+      const rowClass = isChecked ? 'row-selected' : '';
+      html += '<tr class="' + rowClass + '" data-ri="' + ri + '">';
+
+      // Radio
+      html += '<td class="radio-col"><input type="radio" name="detailSelect" value="' + ri + '"' + (isChecked ? ' checked' : '') + '></td>';
+
+      // Info del item (sin Cód.Producto ni Descripción — ya se muestran en nav header)
+      html += '<td class="cell-num">' + esc(item.ItemOT) + '</td>';
+      html += '<td class="cell-num">' + num(item.Cantd) + '</td>';
+      html += '<td class="cell-num">' + num(row.HHFab) + '</td>';
+      html += '<td class="cell-num">' + num(row.PesPptoTotaKg) + ' Kg</td>';
+      html += '<td class="cell-num">' + num(row.PeSoldaduraKg) + ' Kg</td>';
+
+      // Datos complementarios
+      html += '<td class="cell-info cell-num">' + esc(row.Year) + '</td>';
+      html += '<td class="cell-info" title="' + esc(row.ProjectCode) + '">' + esc(row.ProjectCode) + '</td>';
+      html += '<td class="cell-num">' + num(row.RendihtoPpto) + '</td>';
+
+      ALL_PROC.forEach(code => {
+        const val = parseFloat(row[code]) || 0;
+        rowTotal += val;
+        totals[code] += val;
+        const cls = val === 0 ? 'cell-num cell-zero' : (val > 100 ? 'cell-num cell-high' : 'cell-num');
+        html += '<td class="' + cls + '">' + (val === 0 ? '—' : val.toLocaleString('es-CL', { maximumFractionDigits: 1 })) + '</td>';
+      });
+
+      grandTotal += rowTotal;
+      html += '<td class="cell-num" style="font-weight:700;background:#f8f9fc;">' + rowTotal.toLocaleString('es-CL', { maximumFractionDigits: 1 }) + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody>';
+
+    // TFOOT (totales)
+    if (rows.length > 1) {
+      html += '<tfoot><tr>';
+      html += '<td class="foot-label" colspan="9">TOTALES</td>';
+      ALL_PROC.forEach(code => {
+        const v = totals[code];
+        html += '<td>' + (v === 0 ? '—' : v.toLocaleString('es-CL', { maximumFractionDigits: 1 })) + '</td>';
+      });
+      html += '<td style="font-size:12px;">' + grandTotal.toLocaleString('es-CL', { maximumFractionDigits: 1 }) + '</td>';
+      html += '</tr></tfoot>';
+    }
+
+    html += '</table></div>';
+
+    // Botón Agregar
+    html += '<div class="btn-agregar-wrap">';
+    html += '<button class="btn-agregar" id="btnAgregarEdicion"><i class="fas fa-plus-circle"></i> Agregar a tabla de edición</button>';
+    html += '<span class="btn-agregar-hint"><i class="fas fa-info-circle"></i> Selecciona una fila con el radio y presiona Agregar</span>';
+    html += '</div>';
+
+    content.innerHTML = html;
+
+    // ── Eventos radio: highlight fila seleccionada
+    content.querySelectorAll('input[name="detailSelect"]').forEach(radio => {
+      radio.addEventListener('change', function() {
+        content.querySelectorAll('#dtblDetalle tbody tr').forEach(tr => tr.classList.remove('row-selected'));
+        this.closest('tr').classList.add('row-selected');
+      });
+    });
+
+    // Click en fila también selecciona radio
+    content.querySelectorAll('#dtblDetalle tbody tr').forEach(tr => {
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', function(e) {
+        if (e.target.type === 'radio') return; // evitar doble trigger
+        const radio = this.querySelector('input[type="radio"]');
+        if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change')); }
+      });
+    });
+
+    // Botón Agregar
+    document.getElementById('btnAgregarEdicion').addEventListener('click', function() {
+      const sel = content.querySelector('input[name="detailSelect"]:checked');
+      if (!sel) { alert('Selecciona una fila primero.'); return; }
+      const ri = parseInt(sel.value, 10);
+      const rowData = rows[ri];
+
+      // Combinar datos del item padre + row detalle
+      // HHFab, PesPptoTotaKg, PeNetTotKg se cargan desde tblItems (item padre)
+      const combined = Object.assign({}, rowData, {
+        _codProducto: codProd,
+        _detailSource: currentDetailSource,
+        _descripcion: item.Descripci || '',
+        _item: item.ItemOT || '',
+        _cantidad: item.Cantd || 0,
+        _pesoNeto: item.PeNetTotKg || 0,
+        _hhFab: item.HHFab || 0,
+        _pesoPpto: item.PesPptoTotaKg || 0,
+        _tipo: item.Tipoproyecto || '',
+        _numOF: item.NumOF || '',
+        _cliente: item.Cliente || '',
+        _proyecto: item.Proyecto11 || '',
+        _sem: item.NroSemIngresOT || '',
+        _feaing: item.FechaIngreOC || '',
+        _fearequ: item.FecReqCli || '',
+        _oc: item.NumerOCenviacliente || '',
+        _estado: 'Producción',
+        _pesoNetoTotal: item.PeNetTotKg || 0,
+        _rendimiento: item.RendihtoPpto || 0,
+        _fechaTerminada: item.Fecha_Terminada || '0000-00-00',
+        _rowIdx: ri
+      });
+
+      selectedRowsByItem[codProd] = combined;
+      renderEditTable();
+
+      // Feedback visual
+      const btn = this;
+      btn.innerHTML = '<i class="fas fa-check"></i> Agregado!';
+      btn.style.background = '#17a673';
+      setTimeout(() => {
+        btn.innerHTML = '<i class="fas fa-plus-circle"></i> Agregar a tabla de edición';
+        btn.style.background = '';
+      }, 1500);
+    });
+  }
+
+  /* ════════════════════════════════════════════
+     EDIT TABLE  (items seleccionados)
+     — Con columnas split, inputs editables, Tipo, Guardar
+  ════════════════════════════════════════════ */
+
+  // Columnas split para la tabla de edición
+  const EDIT_HAB  = ['MO001_1','MO001_2','MO002','MO004H'];           // 4 cols
+  const EDIT_FAB  = ['MO014','MO008_1','MO008_2','MO007_1','MO007_2','MO003','MO015','MO005','MO009','MO004P','MO006']; // 11 cols
+  const EDIT_ACAB = ['MO012','MO011','MO020','MO010'];                 // 4 cols
+  const EDIT_ALL  = [...EDIT_HAB, ...EDIT_FAB, ...EDIT_ACAB];          // 19 cols
+
+  const EDIT_PROC_NAMES = {
+    MO001_1: 'Pantógrafo Grande', MO001_2: 'Pantógrafo Chico',
+    MO002: 'Hab. Perfiles', MO004H: 'Limp. Mecánica',
+    MO014: 'Rolado', MO008_1: 'Torno Grande', MO008_2: 'Torno Chico',
+    MO007_1: 'CNC Grande', MO007_2: 'CNC Chico',
+    MO003: 'Armado', MO015: 'Soldeo', MO005: 'Plantillado',
+    MO009: 'Taladro', MO004P: 'Limp. Mecánica', MO006: 'Ensamble',
+    MO012: 'Granallado', MO011: 'Pintura', MO020: 'Decapado/Pasivado', MO010: 'Embalaje'
+  };
+
+  function renderEditTable() {
+    const container = document.getElementById('editTableContainer');
+    const keys = Object.keys(selectedRowsByItem);
+    if (keys.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    let html = '<div class="edit-panel">';
+    html += '<div class="edit-panel-header">';
+    html += '<h5><i class="fas fa-edit"></i> Tabla de Edición</h5>';
+    html += '<span class="badge-edit">' + keys.length + ' item' + (keys.length !== 1 ? 's' : '') + '</span>';
+    html += '</div>';
+    html += '<div class="edit-panel-body">';
+    html += '<table class="etbl" id="etblEdit">';
+
+    // THEAD fila 1 (grupos)
+    html += '<thead>';
+    html += '<tr>';
+    html += '<th style="background:var(--danger);color:#fff;" rowspan="2"><i class="fas fa-trash"></i></th>';
+    html += '<th style="background:#5b6abf;color:#fff;" rowspan="2">Tipo</th>';
+    html += '<th style="background:#5b6abf;color:#fff;" colspan="6">Información del Item</th>';
+    html += '<th style="background:#27ae60;color:#fff;" colspan="' + EDIT_HAB.length + '">Habilitado META</th>';
+    html += '<th style="background:#f1c40f;color:#333;" colspan="' + EDIT_FAB.length + '">Fabricación HH META</th>';
+    html += '<th style="background:#3498db;color:#fff;" colspan="' + EDIT_ACAB.length + '">Acabados HH META</th>';
+    html += '<th style="background:#2c3e50;color:#fff;" rowspan="2">Total</th>';
+    html += '</tr>';
+
+    // THEAD fila 2 (sub-columnas)
+    html += '<tr>';
+    html += '<th style="background:#eef0fb;font-size:8px;">Item</th>';
+    html += '<th style="background:#eef0fb;font-size:8px;">Descripción</th>';
+    html += '<th style="background:#eef0fb;font-size:8px;">Cant.</th>';
+    html += '<th style="background:#eef0fb;font-size:8px;">HH Ppto</th>';
+    html += '<th style="background:#eef0fb;font-size:8px;">Peso Ppto</th>';
+    html += '<th style="background:#eef0fb;font-size:8px;">Peso Sold.</th>';
+    EDIT_ALL.forEach(code => {
+      html += '<th style="background:#f8f9fc;font-size:7px;writing-mode:vertical-rl;height:80px;">' + esc(EDIT_PROC_NAMES[code] || code) + '</th>';
+    });
+    html += '</tr>';
+    html += '</thead>';
+
+    // TBODY
+    html += '<tbody>';
+    keys.forEach(codProd => {
+      const d = selectedRowsByItem[codProd];
+
+      // Calcular valores por unidad
+      const qty = parseFloat(d._cantidad) || parseFloat(d.PlannedParentQuantity) || 1;
+      const hhPorUni   = (parseFloat(d._hhFab) || parseFloat(d.HHFab) || 0) / qty;
+      const pesoPptoUni = (parseFloat(d._pesoPpto) || parseFloat(d.PesPptoTotaKg) || 0) / qty;
+      const pesoSoldUni = (parseFloat(d.PeSoldaduraKg) || 0) / qty;
+      const tipoInicial = (d._tipo || d.Tipoproyecto || '').toString().trim().toUpperCase();
+      const detailSource = (d._detailSource || d._source || '').toString().toLowerCase();
+
+      // Historico divide por cantidad; SAP por OITT conserva el valor tal cual.
+      function getMoBaseValue(code) {
+        const rawValue = parseFloat(d[code]) || 0;
+        return detailSource === 'sap' || detailSource === 'sap_bom'
+          ? rawValue
+          : (rawValue / qty);
+      }
+      function moPerUni(code) { return getMoBaseValue(code).toFixed(1); }
+      function moSplitPerUni(code) { return (getMoBaseValue(code) / 2).toFixed(1); }
+
+      html += '<tr data-cod="' + esc(codProd) + '">';
+
+      // Quitar
+      html += '<td><button class="btn-remove-row" data-cod="' + esc(codProd) + '" title="Quitar"><i class="fas fa-times"></i></button></td>';
+
+      // Tipo selector
+      html += '<td class="tipo-selector-cell"><select class="tipo-selector form-control form-control-sm">' + tipoOptionsHtml + '</select></td>';
+
+      // Info: Item, Desc, Cant, HH Ppto, Peso Ppto, Peso Soldadura
+      html += '<td style="font-size:9px;">' + esc(d._item || d.NumOF || '') + '</td>';
+      html += '<td class="td-left" title="' + esc(d._descripcion || d.NPdre1 || '') + '">' + truncate(d._descripcion || d.NPdre1 || '', 20) + '</td>';
+      html += '<td class="qty-cell">' + qty.toFixed(0) + '</td>';
+      html += '<td class="hh-ppto" data-hh="' + hhPorUni.toFixed(2) + '">' + hhPorUni.toFixed(2) + '</td>';
+      html += '<td class="PesPptoTotaKg">' + pesoPptoUni.toFixed(2) + '</td>';
+      html += '<td class="peso-soldadura">' + pesoSoldUni.toFixed(2) + '</td>';
+
+      // MO inputs (con splits)
+      html += '<td><input type="number" class="MO001_1" value="' + moSplitPerUni('MO001') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO001_2" value="' + moSplitPerUni('MO001') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO002" value="' + moPerUni('MO002') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO004H" value="' + moPerUni('MO004H') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO014" value="' + moPerUni('MO014') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO008_1" value="' + moSplitPerUni('MO008') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO008_2" value="' + moSplitPerUni('MO008') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO007_1" value="' + moSplitPerUni('MO007') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO007_2" value="' + moSplitPerUni('MO007') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO003" value="' + moPerUni('MO003') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO015" value="' + moPerUni('MO015') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO005" value="' + moPerUni('MO005') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO009" value="' + moPerUni('MO009') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO004P" value="' + moPerUni('MO004P') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO006" value="' + moPerUni('MO006') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO012" value="' + moPerUni('MO012') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO011" value="' + moPerUni('MO011') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO020" value="' + moPerUni('MO020') + '" step="0.1"></td>';
+      html += '<td><input type="number" class="MO010" value="' + moPerUni('MO010') + '" step="0.1"></td>';
+
+      // Total (calculado)
+      html += '<td class="totalMO">0</td>';
+
+      // Hidden fields para guardar
+      html += '<td class="hidden" data-field="Year">' + esc(d.Year || '') + '</td>';
+      html += '<td class="hidden" data-field="ProjectCode">' + esc(d.ProjectCode || '') + '</td>';
+      html += '<td class="hidden" data-field="CodPdre">' + esc(codProd) + '</td>';
+      html += '<td class="hidden" data-field="ClientName">' + esc(d._cliente || d.ClientName || '') + '</td>';
+      html += '<td class="hidden" data-field="PesPptoUniKg">' + (parseFloat(d.PesPptoUniKg) || 0).toFixed(2) + '</td>';
+      html += '<td class="hidden" data-field="NumOF">' + esc(d._numOF || d.NumOF || '') + '</td>';
+      html += '<td class="hidden" data-field="SEM">' + esc(d._sem || d.SEM || '') + '</td>';
+      html += '<td class="hidden" data-field="CANTI">' + (parseFloat(d._cantidad) || parseFloat(d.PlannedParentQuantity) || 0) + '</td>';
+      html += '<td class="hidden" data-field="ITEM">' + esc(d._item || d.ItemOT || '') + '</td>';
+      html += '<td class="hidden" data-field="FEAING">' + esc(d._feaing || d.FEAING || '') + '</td>';
+      html += '<td class="hidden" data-field="FEAREQU">' + esc(d._fearequ || d.FEAREQU || '') + '</td>';
+      html += '<td class="hidden" data-field="OC">' + esc(d._oc || d.OC || '') + '</td>';
+      html += '<td class="hidden" data-field="ESTADO">' + esc(d._estado || d.ESTADO || 'Producción') + '</td>';
+      html += '<td class="hidden" data-field="PESONETOTOTALKG">' + (parseFloat(d._pesoNetoTotal) || parseFloat(d.PESONETOTOTALKG) || parseFloat(d._pesoNeto) || 0) + '</td>';
+      html += '<td class="hidden" data-field="RENDIMEINTOHHTONPPTO">' + (parseFloat(d._rendimiento) || parseFloat(d.RENDIMEINTOHHTONPPTO) || parseFloat(d.RendihtoPpto) || 0) + '</td>';
+      html += '<td class="hidden" data-field="FECHATERMINADA">' + esc(d._fechaTerminada || d.FECHATERMINADA || '0000-00-00') + '</td>';
+      html += '<td class="hidden" data-field="CodProyect">' + esc(selectedOT) + '</td>';
+
+      html += '</tr>';
+    });
+    html += '</tbody>';
+    html += '</table>';
+
+    // Botón Guardar
+    html += '<div style="margin-top:12px;display:flex;gap:8px;">';
+    html += '<button class="btn btn-primary btn-sm" id="btnGuardarTabla"><i class="fas fa-save"></i> Guardar Tabla</button>';
+    html += '</div>';
+
+    html += '</div></div>';
+
+    container.innerHTML = html;
+
+    // ── Inicializar ──
+
+    // Set tipo value
+    container.querySelectorAll('#etblEdit tbody tr').forEach(tr => {
+      const cod = tr.getAttribute('data-cod');
+      const d = selectedRowsByItem[cod];
+      const tipoInicial = (d._tipo || d.Tipoproyecto || '').toString().trim().toUpperCase();
+      const sel = tr.querySelector('.tipo-selector');
+      if (tipoInicial && sel.querySelector('option[value="' + tipoInicial + '"]')) {
+        sel.value = tipoInicial;
+      }
+      // Recalc total
+      recalcRowTotal(tr);
+      // Apply tipo if set
+      if (tipoInicial && tipoDistribuciones[tipoInicial]) {
+        applyTipoDistribution(tr, tipoInicial);
+      }
+    });
+
+    // Evento quitar fila
+    container.querySelectorAll('.btn-remove-row').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const cod = this.getAttribute('data-cod');
+        delete selectedRowsByItem[cod];
+        renderEditTable();
+      });
+    });
+
+    // Evento cambio en inputs MO → recalcular total
+    container.querySelectorAll('#etblEdit input[type="number"]').forEach(inp => {
+      inp.addEventListener('input', function() {
+        recalcRowTotal(this.closest('tr'));
+      });
+    });
+
+    // Evento cambio de Tipo → aplicar distribución
+    container.querySelectorAll('#etblEdit .tipo-selector').forEach(sel => {
+      sel.addEventListener('change', function() {
+        const tr = this.closest('tr');
+        const tipo = this.value;
+        if (!tipo) {
+          tr.querySelector('.tipo-selector-cell').classList.add('tipo-missing');
+          return;
+        }
+        applyTipoDistribution(tr, tipo);
+      });
+    });
+
+    // Soporte copiar/pegar desde Excel
+    container.querySelectorAll('#etblEdit input[type="number"]').forEach(inp => {
+      inp.addEventListener('paste', function(e) {
+        e.preventDefault();
+        const clipData = (e.clipboardData || window.clipboardData).getData('text') || '';
+        const pasteRows = clipData.split(/\r?\n/).filter(r => r.trim());
+        if (!pasteRows.length) return;
+
+        const startTr = this.closest('tr');
+        const startInputs = Array.from(startTr.querySelectorAll('input[type="number"]'));
+        const startIdx = startInputs.indexOf(this);
+
+        let currentTr = startTr;
+        for (let r = 0; r < pasteRows.length; r++) {
+          if (!currentTr) break;
+          const vals = pasteRows[r].split('\t');
+          const inputs = Array.from(currentTr.querySelectorAll('input[type="number"]'));
+          for (let i = 0; i < vals.length; i++) {
+            const tIdx = startIdx + i;
+            if (tIdx < inputs.length) {
+              inputs[tIdx].value = vals[i].trim();
+            }
+          }
+          recalcRowTotal(currentTr);
+          currentTr = currentTr.nextElementSibling;
+        }
+      });
+    });
+
+    // Evento doble-click para editar celdas no-input (HH Ppto, Peso Ppto, etc.)
+    container.querySelectorAll('#etblEdit td:not(:has(input)):not(:has(button)):not(:has(select)):not(.hidden)').forEach(td => {
+      td.addEventListener('dblclick', function() {
+        if (this.querySelector('input')) return;
+        const orig = this.textContent.trim();
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.value = parseFloat(orig) || 0;
+        inp.style.cssText = 'width:60px;padding:2px;text-align:center;font-size:10px;';
+        this.textContent = '';
+        this.appendChild(inp);
+        inp.focus();
+        inp.addEventListener('blur', function() {
+          const nv = parseFloat(this.value);
+          td.textContent = !isNaN(nv) ? nv.toFixed(2) : orig;
+          // Update data-hh if it's the HH ppto cell
+          if (td.classList.contains('hh-ppto')) td.setAttribute('data-hh', td.textContent);
+        });
+        inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') this.blur(); });
+      });
+    });
+
+    // Botón Guardar
+    document.getElementById('btnGuardarTabla').addEventListener('click', guardarTabla);
+  }
+
+  /* ═══ Calcular total de una fila (suma MO inputs) ═══ */
+  function calculateTotalMO(tr) {
+    let total = 0;
+    EDIT_ALL.forEach(field => {
+      const inp = tr.querySelector('input.' + field);
+      if (inp) total += parseFloat(inp.value) || 0;
+    });
+    return total;
+  }
+
+  function recalcRowTotal(tr) {
+    const total = calculateTotalMO(tr);
+    const cell = tr.querySelector('.totalMO');
+    if (cell) cell.textContent = total.toFixed(2);
+  }
+
+  /* ═══ Aplicar distribución por Tipo (calculohoras) ═══ */
+  function applyTipoDistribution(tr, tipo) {
+    if (!tipo) return;
+    const dist = tipoDistribuciones[tipo];
+    if (!dist) { console.warn('No hay config para tipo:', tipo); return; }
+
+    const baseHH = parseFloat(tr.querySelector('.hh-ppto').getAttribute('data-hh')) ||
+                   parseFloat(tr.querySelector('.hh-ppto').textContent) || 0;
+    if (!baseHH) { console.warn('HH Ppto no definido, no se puede aplicar tipo'); return; }
+
+    const processDefs = [
+      { key: 'MO001', selectors: ['.MO001_1', '.MO001_2'] },
+      { key: 'MO002', selectors: ['.MO002'] },
+      { key: 'MO004', selectors: ['.MO004H'] },
+      { key: 'MO014', selectors: ['.MO014'] },
+      { key: 'MO008', selectors: ['.MO008_1', '.MO008_2'] },
+      { key: 'MO007', selectors: ['.MO007_1', '.MO007_2'] },
+      { key: 'MO003', selectors: ['.MO003'] },
+      { key: 'MO015', selectors: ['.MO015'] },
+      { key: 'MO005', selectors: ['.MO005'] },
+      { key: 'MO009', selectors: ['.MO009'] },
+      { key: 'MO004P', selectors: ['.MO004P'] },
+      { key: 'MO006', selectors: ['.MO006'] },
+      { key: 'MO012', selectors: ['.MO012'] },
+      { key: 'MO011', selectors: ['.MO011'] },
+      { key: 'MO020', selectors: ['.MO020'] },
+      { key: 'MO010', selectors: ['.MO010'] }
+    ];
+
+    processDefs.forEach(def => {
+      const pct = parseFloat(dist[def.key]);
+      if (isNaN(pct)) return;
+      const horasTot = baseHH * (pct / 100);
+      if (def.selectors.length > 1) {
+        const frac = horasTot / def.selectors.length;
+        def.selectors.forEach(sel => {
+          const inp = tr.querySelector('input' + sel);
+          if (inp) inp.value = frac.toFixed(2);
+        });
+      } else {
+        const inp = tr.querySelector('input' + def.selectors[0]);
+        if (inp) inp.value = horasTot.toFixed(2);
+      }
+    });
+
+    tr.querySelector('.tipo-selector-cell').classList.remove('tipo-missing');
+    recalcRowTotal(tr);
+  }
+
+  /* ═══ Cargar TODOS los items de la OT a la tabla de edición ═══ */
+  async function cargarTodosItems() {
+    if (!itemsActuales.length) {
+      alert('Primero busca una OT para cargar sus items.');
+      return;
+    }
+
+    let loaded = 0;
+    for (const item of itemsActuales) {
+      const codProd = item.Cdigproducto;
+      if (!codProd || selectedRowsByItem[codProd]) continue;  // skip duplicates
+
+      try {
+        const detalle = await fetchDetalleRows(item);
+        const detailRows = detalle.rows;
+        if (detailRows.length === 0) continue;
+
+        // Tomar la primera fila de detalle
+        const rowData = detailRows[0];
+        selectedRowsByItem[codProd] = Object.assign({}, rowData, {
+          _codProducto: codProd,
+          _detailSource: currentDetailSource,
+          _descripcion: item.Descripci || '',
+          _item: item.ItemOT || '',
+          _cantidad: item.Cantd || 0,
+          _pesoNeto: item.PeNetTotKg || 0,
+          _hhFab: item.HHFab || 0,
+          _pesoPpto: item.PesPptoTotaKg || 0,
+          _tipo: item.Tipoproyecto || '',
+          _numOF: item.NumOF || '',
+          _cliente: item.Cliente || '',
+          _proyecto: item.Proyecto11 || '',
+          _sem: item.NroSemIngresOT || '',
+          _feaing: item.FechaIngreOC || '',
+          _fearequ: item.FecReqCli || '',
+          _oc: item.NumerOCenviacliente || '',
+          _estado: 'Producción',
+          _pesoNetoTotal: item.PeNetTotKg || 0,
+          _rendimiento: item.RendihtoPpto || 0,
+          _fechaTerminada: item.Fecha_Terminada || '0000-00-00',
+          _rowIdx: 0
+        });
+        loaded++;
+      } catch (e) {
+        console.warn('Error cargando detalle para', codProd, e);
+      }
+    }
+
+    renderEditTable();
+    if (loaded > 0) {
+      showAlert('<i class="fas fa-check-circle"></i> Se cargaron <strong>' + loaded + '</strong> items a la tabla de edición.', 'success');
+    } else {
+      showAlert('<i class="fas fa-info-circle"></i> No se encontraron items nuevos para cargar.', '');
+    }
+  }
+
+  /* ═══ Calcular proporcional (escalar MO por PesPptoTotaKg) ═══ */
+  function calcularProporcional() {
+    const rows = document.querySelectorAll('#etblEdit tbody tr');
+    if (rows.length < 2) {
+      alert('Se necesitan al menos 2 filas para calcular proporcionalmente.');
+      return;
+    }
+
+    // La primera fila es la referencia
+    const refRow = rows[0];
+    const refPeso = parseFloat(refRow.querySelector('.PesPptoTotaKg').textContent) || 0;
+    if (!refPeso) {
+      alert('La primera fila no tiene Peso Ppto definido.');
+      return;
+    }
+
+    // Para cada columna MO, tomar el valor de la fila referencia
+    // y escalar proporcionalmente al peso de cada fila
+    for (let r = 1; r < rows.length; r++) {
+      const tr = rows[r];
+      const rowPeso = parseFloat(tr.querySelector('.PesPptoTotaKg').textContent) || 0;
+      const ratio = refPeso ? (rowPeso / refPeso) : 0;
+
+      EDIT_ALL.forEach(field => {
+        const refInp = refRow.querySelector('input.' + field);
+        const rowInp = tr.querySelector('input.' + field);
+        if (refInp && rowInp) {
+          const refVal = parseFloat(refInp.value) || 0;
+          rowInp.value = (refVal * ratio).toFixed(2);
+        }
+      });
+
+      recalcRowTotal(tr);
+    }
+
+    showAlert('<i class="fas fa-calculator"></i> Cálculo proporcional aplicado. La primera fila es la referencia.', 'success');
+  }
+
+  /* ═══ Guardar Tabla → otpadre + othija ═══ */
+  function guardarTabla() {
+    const rows = document.querySelectorAll('#etblEdit tbody tr');
+    if (!rows.length) { alert('No hay datos para guardar.'); return; }
+    if (!selectedOT) { alert('No hay OT seleccionada.'); return; }
+
+    // Confirmación para evitar doble guardado
+    if (!confirm('¿Estás seguro de guardar ' + rows.length + ' item(s) para la OT ' + selectedOT + '?\n\nNota: Los items que ya existen en la base de datos serán omitidos automáticamente (candado anti-duplicados).')) {
+      return;
+    }
+
+    // ── 1. Guardar en otpadre (INSERT si no existe) ──
+    const padreData = {
+      numValuePE: numValuePE,
+      proyecto: selectedOT,
+      nproyecto: selectedProyectoNombre,
+      nivelpro: '',
+      HrHnivelpro: ''
+    };
+
+    // Recolectar datos de filas para othija
+    const tableData = [];
+    let hasError = false;
+
+    rows.forEach(tr => {
+      if (hasError) return;
+      const tipoValue = (tr.querySelector('.tipo-selector').value || '').trim();
+      if (!tipoValue) {
+        tr.querySelector('.tipo-selector-cell').classList.add('tipo-missing');
+      }
+
+      const cantidadTotal = parseFloat(getHiddenField(tr, 'CANTI')) || 1;
+
+      function getInputVal(cls) {
+        const inp = tr.querySelector('input.' + cls);
+        return (parseFloat(inp ? inp.value : 0) || 0) * cantidadTotal;
+      }
+
+      const rowData = {
+        ITEM: getHiddenField(tr, 'ITEM'),
+        Year: parseInt(getHiddenField(tr, 'Year')) || 0,
+        ProjectCode: getHiddenField(tr, 'ProjectCode'),
+        CodPdre: getHiddenField(tr, 'CodPdre'),
+        NPdre: tr.querySelector('td.td-left') ? tr.querySelector('td.td-left').textContent.trim() : '',
+        ClientName: getHiddenField(tr, 'ClientName'),
+        PlannedParentQuantity: parseFloat(tr.querySelector('.qty-cell').textContent) || 0,
+
+        HHFab: (parseFloat(tr.querySelector('.hh-ppto').textContent) || 0) * cantidadTotal,
+        PesPptoTotaKg: (parseFloat(tr.querySelector('.PesPptoTotaKg').textContent) || 0) * cantidadTotal,
+        PeSoldaduraKg: (parseFloat(tr.querySelector('.peso-soldadura').textContent) || 0) * cantidadTotal,
+
+        MO001_1: getInputVal('MO001_1'),
+        MO001_2: getInputVal('MO001_2'),
+        MO002: getInputVal('MO002'),
+        MO004: getInputVal('MO004H'),
+        MO014: getInputVal('MO014'),
+        MO008_1: getInputVal('MO008_1'),
+        MO008_2: getInputVal('MO008_2'),
+        MO007_1: getInputVal('MO007_1'),
+        MO007_2: getInputVal('MO007_2'),
+        MO003: getInputVal('MO003'),
+        MO015: getInputVal('MO015'),
+        MO005: getInputVal('MO005'),
+        MO009: getInputVal('MO009'),
+        MO004P: getInputVal('MO004P'),
+        MO006: getInputVal('MO006'),
+        MO012: getInputVal('MO012'),
+        MO011: getInputVal('MO011'),
+        MO020: getInputVal('MO020'),
+        MO010: getInputVal('MO010'),
+
+        PesPptoUniKg: parseFloat(getHiddenField(tr, 'PesPptoUniKg')) || 0,
+        Numof: getHiddenField(tr, 'NumOF'),
+        SEM: getHiddenField(tr, 'SEM') || 'Sem 00',
+        CANTI: getHiddenField(tr, 'CANTI') || '0',
+        Tipo: tipoValue,
+        FEAING: getHiddenField(tr, 'FEAING') || '0000/00/00',
+        FEAREQU: getHiddenField(tr, 'FEAREQU') || '0000/00/00',
+        OC: getHiddenField(tr, 'OC') || '0',
+        ESTADO: getHiddenField(tr, 'ESTADO') || 'Producción',
+        PESONETOTOTALKG: parseFloat(getHiddenField(tr, 'PESONETOTOTALKG')) || 0,
+        RENDIMEINTOHHTONPPTO: parseFloat(getHiddenField(tr, 'RENDIMEINTOHHTONPPTO')) || 0,
+        FECHATERMINADA: getHiddenField(tr, 'FECHATERMINADA') || '0000-00-00',
+        CodProyect: getHiddenField(tr, 'CodProyect'),
+        IdPadreOT: null  // Será asignado después de guardar otpadre
+      };
+
+      if (!rowData.Year || !rowData.ProjectCode || !rowData.CodPdre) {
+        console.warn('Fila omitida - datos esenciales faltantes:', {Year: rowData.Year, ProjectCode: rowData.ProjectCode, CodPdre: rowData.CodPdre});
+        return;
+      }
+
+      tableData.push(rowData);
+    });
+
+    if (tableData.length === 0) {
+      alert('No hay datos válidos para guardar.');
+      return;
+    }
+
+    // Deshabilitar botón mientras guarda
+    const btnGuardar = document.getElementById('btnGuardarTabla');
+    btnGuardar.disabled = true;
+    btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+    console.log('=== GUARDAR TABLA ===');
+    console.log('padreData:', padreData);
+    console.log('tableData (' + tableData.length + ' filas):', tableData);
+
+    // Paso 1: Guardar en otpadre
+    fetch(SAVE_OTPADRE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(padreData)
+    })
+    .then(res => res.json())
+    .then(padreResp => {
+      console.log('otpadre response:', padreResp);
+      if (!padreResp.ok) {
+        throw new Error('Error OT Padre: ' + (padreResp.error || padreResp.detail || 'Desconocido'));
+      }
+
+      // Asignar el IdPadreOT correcto del servidor a todos los tableData
+      const correctIdPadre = padreResp.idPadre || padreResp.idPadreOT;
+      console.log('IdPadre correcto del servidor:', correctIdPadre);
+      tableData.forEach(row => {
+        row.IdPadreOT = correctIdPadre;
+      });
+
+      // Paso 2: Guardar en othija
+      return fetch(SAVE_OTHIJA_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tableData)
+      })
+      .then(res => res.json())
+      .then(hijaResp => {
+        console.log('othija response:', hijaResp);
+
+        if (!hijaResp.ok) {
+          alert('Error al guardar items:\n' + (hijaResp.error || '') + '\n' + (hijaResp.detail || ''));
+          return;
+        }
+
+        let msg = '=== Resultado del guardado ===\n\n';
+        msg += 'OT Padre: ' + (padreResp.message || 'OK') + '\n\n';
+        msg += 'Items enviados: ' + hijaResp.total + '\n';
+        msg += 'Insertados: ' + hijaResp.inserted + '\n';
+        if (hijaResp.skipped > 0) msg += 'Ya existían (omitidos): ' + hijaResp.skipped + '\n';
+        if (hijaResp.errors > 0)  msg += 'Con errores: ' + hijaResp.errors + '\n';
+
+        // Mostrar detalle si hay problemas
+        if (hijaResp.detail && hijaResp.detail.length > 0) {
+          msg += '\nDetalle:\n';
+          hijaResp.detail.forEach(d => {
+            msg += '  ' + d.status.toUpperCase() + ': ' + d.msg + '\n';
+          });
+        }
+
+        alert(msg);
+
+        if (hijaResp.inserted > 0) {
+          selectedRowsByItem = {};
+          renderEditTable();
+        }
+      });
+    })
+    .catch(err => {
+      console.error('Error guardando:', err);
+      alert('Error al guardar:\n' + err.message);
+    })
+    .finally(() => {
+      btnGuardar.disabled = false;
+      btnGuardar.innerHTML = '<i class="fas fa-save"></i> Guardar Tabla';
+    });
+  }
+
+  /* ═══ Helper: obtener campo hidden de una fila ═══ */
+  function getHiddenField(tr, field) {
+    const td = tr.querySelector('[data-field="' + field + '"]');
+    return td ? td.textContent.trim() : '';
+  }
+
+  function truncate(str, max) {
+    if (!str) return '—';
+    const s = String(str);
+    return s.length > max ? esc(s.substring(0, max)) + '…' : esc(s);
+  }
+
+  /* ════════════════════════════════════════════════
+     UI HELPERS
+  ════════════════════════════════════════════════ */
+  function showLoading() {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('tableWrapper').style.display = 'none';
+    document.getElementById('loadingState').style.display = 'block';
+    document.getElementById('alertBar').style.display = 'none';
+  }
+  function showEmpty() {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('tableWrapper').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+  }
+  function showTable() {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('tableWrapper').style.display = 'block';
+  }
+  function showAlert(msg, type) {
+    const bar = document.getElementById('alertBar');
+    bar.className = 'alert-info-bar ' + (type || '');
+    bar.innerHTML = msg;
+    bar.style.display = 'flex';
+  }
+
+  function esc(v) {
+    if (v == null) return '';
+    const d = document.createElement('div');
+    d.textContent = String(v);
+    return d.innerHTML;
+  }
+  function num(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return '0';
+    return n.toLocaleString('es-CL', { maximumFractionDigits: 1 });
+  }
+})();
+</script>
+
+<?php include_once dirname(dirname(__DIR__)) . '/layouts/footer.php'; ?>
+

@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `mantenimientos_ot_costos_documentos` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `sap_cost_code` VARCHAR(50) NOT NULL,
+  `ot_docentry` INT UNSIGNED NOT NULL,
+  `nombre_original` VARCHAR(255) NOT NULL,
+  `nombre_archivo` VARCHAR(255) NOT NULL,
+  `ruta_relativa` VARCHAR(500) NOT NULL COMMENT 'Estructura: YYYY/MM/ot_DocEntry/archivo',
+  `mime_type` VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
+  `tamano_bytes` BIGINT UNSIGNED NOT NULL,
+  `user_id` INT(11) UNSIGNED NULL,
+  `legacy_cost_id` BIGINT UNSIGNED NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_ot_costo_documento_sap` (`sap_cost_code`),
+  UNIQUE KEY `uq_ot_costo_documento_archivo` (`nombre_archivo`),
+  UNIQUE KEY `uq_ot_costo_documento_legacy` (`legacy_cost_id`),
+  KEY `idx_ot_costo_documento_ot` (`ot_docentry`, `created_at`),
+  KEY `idx_ot_costo_documento_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

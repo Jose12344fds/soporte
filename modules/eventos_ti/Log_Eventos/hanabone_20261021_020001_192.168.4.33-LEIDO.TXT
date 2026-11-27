@@ -1,0 +1,600 @@
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:53",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:53",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:55",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:55",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:55",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:55",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:55",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:55",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:57",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:57",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:57",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:57",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:57",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:57",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:59",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:59",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:59",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:59",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:59",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:52:59",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:01",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:01",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:01",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:01",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:01",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:01",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:03",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:03",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:03",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:03",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:03",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:03",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:05",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:05",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:05",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:05",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:05",
+  "CodigoEvento": "kernel",
+  "Severidad": "INFORMACION",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento del kernel ",
+  "Mensaje": "CIFS: Status code returned 0xc000005e STATUS_NO_LOGON_SERVERS "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 01:53:05",
+  "CodigoEvento": "kernel",
+  "Severidad": "ERROR",
+  "Proveedor": "kernel ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Error detectado en SUSE ",
+  "Mensaje": "CIFS: VFS: \\\\\\\\192.168.4.8 Send error in SessSetup = -5 "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Started Timeline of Snapper Snapshots. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Started Session c3221 of User root. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "dbus-daemon",
+  "Severidad": "INFORMACION",
+  "Proveedor": "dbus-daemon ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "[system] Activating via systemd: service name='org.opensuse.Snapper' unit='snapperd.service' requested by ':1.9130' (uid=0 pid=17701 comm=\\ "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Started Session c3222 of User root. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Starting DBus interface for snapper... "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "cron",
+  "Severidad": "INFORMACION",
+  "Proveedor": "cron ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de tarea programada ",
+  "Mensaje": "pam_unix(crond:session): session opened for user root by (uid=0) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "CRON",
+  "Severidad": "INFORMACION",
+  "Proveedor": "CRON ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de tarea programada ",
+  "Mensaje": "(root) CMD (/bin/bash /opt/scripts/generar_capacidad_TI.sh) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "dbus-daemon",
+  "Severidad": "INFORMACION",
+  "Proveedor": "dbus-daemon ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento SUSE ",
+  "Mensaje": "[system] Successfully activated service 'org.opensuse.Snapper' "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "Started DBus interface for snapper. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "systemd",
+  "Severidad": "INFORMACION",
+  "Proveedor": "systemd ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de systemd ",
+  "Mensaje": "snapper-timeline.service: Deactivated successfully. "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "cron",
+  "Severidad": "INFORMACION",
+  "Proveedor": "cron ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de tarea programada ",
+  "Mensaje": "pam_unix(crond:session): session opened for user root by (uid=0) "
+}
+
+{
+  "Fuente": "SUSE",
+  "FechaEvento": "2026-10-21 02:00:01",
+  "CodigoEvento": "CRON",
+  "Severidad": "INFORMACION",
+  "Proveedor": "CRON ",
+  "HostOrigen": "hanabone",
+  "IPOrigen": "192.168.4.33",
+  "Titulo": "Evento de tarea programada ",
+  "Mensaje": "(root) CMD (/bin/bash /opt/scripts/generar_eventos_TI.sh) "
+}
+

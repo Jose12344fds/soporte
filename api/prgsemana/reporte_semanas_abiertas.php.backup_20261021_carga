@@ -1,0 +1,52 @@
+<?php
+require_once __DIR__ . '/../hhmeta_guard.php';
+require_once __DIR__ . '/Conexion.php';
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, max-age=0');
+try {
+    $cn = Conexion::Conectar();
+    $sql = "SELECT ps.IdPrograma AS id_programa, ps.otpadre AS proyecto,
+        COALESCE(ot.ProjectCode, ps.CodProyecto) AS projectCode,
+        COALESCE(ot.NPdre, '') AS descripcion,
+        ps.CodPdre AS item, COALESCE(oh.NPdre, '') AS descripcion_item,
+        ps.CodProceso AS codigo_proceso, COALESCE(p.Nombre, ps.CodProceso) AS proceso,
+        COALESCE(p.Categoria, ps.CodProceso) AS categoria_proceso,
+        ps.Aniio AS anio, ps.Semana AS semana,
+        ROUND(ps.Avance, 2) AS porcentaje, ROUND(ps.TotHoras, 2) AS horas,
+        NOW() AS fecha_calculo
+        FROM programadorsem ps
+        LEFT JOIN otpadre ot ON ot.IdPadreOT = ps.otpadre
+        LEFT JOIN othija oh ON oh.CodPdre = ps.CodPdre AND oh.IdPadreOT = ps.otpadre
+        LEFT JOIN procesos p ON p.Proceso = ps.CodProceso
+        WHERE ps.Estado = 1 AND ps.Aniio >= YEAR(NOW()) - 2
+        ORDER BY ps.Aniio DESC, CAST(ps.Semana AS UNSIGNED) DESC, ps.IdPrograma";
+    $stmt = $cn->query($sql);
+    $datos = [];
+    $vistos = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+        // Mantener el nombre del identificador incluso si PDO cambia el case de los alias.
+        $lower = array_change_key_case($fila, CASE_LOWER);
+        $id = (int)($lower['id_programa'] ?? 0);
+        if ($id <= 0) throw new RuntimeException('El reporte contiene una semana sin identificador. Contacta a soporte.');
+        if (isset($vistos[$id])) continue;
+        $vistos[$id] = true;
+        $fila = $lower;
+        $fila['id_programa'] = $id;
+        $fila['projectCode'] = $lower['projectcode'];
+        $datos[] = $fila;
+    }
+    $proyectos = [];
+    $semanas = [];
+    foreach ($datos as $fila) {
+        $proyectos[$fila['projectCode']] = true;
+        $semanas[$fila['anio'] . '-' . $fila['semana']] = true;
+    }
+    echo json_encode(['success' => true, 'datos' => $datos, 'estadisticas' => [
+        'total_procesos' => count($datos), 'total_proyectos' => count($proyectos),
+        'total_semanas' => count($semanas), 'promedio_dias_retraso' => 0
+    ]], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+} catch (Throwable $e) {
+    http_response_code(500);
+    error_log('Reporte semanas abiertas: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'error' => 'No pudimos cargar las semanas pendientes. Inténtalo nuevamente o contacta a soporte.']);
+}

@@ -1,0 +1,9 @@
+Fuente=WINDOWS
+FechaEvento=2026-09-28 09:00:00
+CodigoEvento=6008
+Severidad=CRITICO
+Proveedor=EventLog
+HostOrigen=WS2025SAP
+IPOrigen=192.168.4.32
+Titulo=Apagado inesperado del servidor
+Mensaje=El cierre anterior del sistema fue inesperado.

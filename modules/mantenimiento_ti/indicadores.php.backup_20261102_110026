@@ -1,0 +1,125 @@
+<?php
+$page_title = 'Indicadores de Mantenimiento TI';
+require_once(__DIR__ . '/../../includes/load.php');
+require_once(__DIR__ . '/../../config/app.php');
+require_once(__DIR__ . '/funciones_checklist.php');
+
+ensure_mantenimiento_ti_schema();
+require_permiso('mantenimiento_ti', 'ver');
+
+$year = (int)($_GET['anio'] ?? date('Y'));
+if ($year < 2020 || $year > 2100) $year = (int)date('Y');
+$quarter = (int)($_GET['trimestre'] ?? ceil((int)date('n') / 3));
+if ($quarter < 0 || $quarter > 4) $quarter = 0;
+$startMonth = $quarter > 0 ? (($quarter - 1) * 3 + 1) : 1;
+$endMonth = $quarter > 0 ? $startMonth + 2 : 12;
+$start = sprintf('%04d-%02d-01', $year, $startMonth);
+$end = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $year, $endMonth)));
+$periodLabel = $quarter > 0 ? "T{$quarter} {$year}" : "Año {$year}";
+
+function mti_ind_h($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
+function mti_ind_pct($part, $total): float { return (float)$total > 0 ? round((float)$part * 100 / (float)$total, 1) : 0.0; }
+function mti_ind_scalar(string $sql): array {
+    global $db;
+    return $db->fetch_assoc($db->query($sql)) ?: [];
+}
+function mti_ind_tone(float $value, float $target): string {
+    if ($value >= $target) return 'success';
+    if ($value >= max(0, $target - 10)) return 'warning';
+    return 'danger';
+}
+
+$orders = mti_ind_scalar(
+    "SELECT COUNT(*) programados,"
+    . " SUM(estado='COMPLETADO') completados,"
+    . " SUM(estado='COMPLETADO' AND fecha_ejecucion IS NOT NULL AND fecha_ejecucion<=fecha_programada) a_tiempo,"
+    . " SUM(estado<>'COMPLETADO' AND fecha_programada<CURDATE()) vencidos,"
+    . " SUM(estado='EN_PROCESO') en_proceso"
+    . " FROM activos_mantenimientos"
+    . " WHERE estado<>'CANCELADO' AND fecha_programada BETWEEN '{$start}' AND '{$end}'"
+);
+$programmed = (int)($orders['programados'] ?? 0);
+$completed = (int)($orders['completados'] ?? 0);
+$onTime = (int)($orders['a_tiempo'] ?? 0);
+$overdue = (int)($orders['vencidos'] ?? 0);
+$maintenancePct = mti_ind_pct($completed, $programmed);
+$onTimePct = mti_ind_pct($onTime, $completed);
+
+$schemaReady = mti_chk_schema_ready();
+$checklists = ['asignados' => 0, 'completados' => 0];
+$findings = ['total' => 0, 'cerrados' => 0, 'abiertos' => 0, 'criticos_abiertos' => 0, 'dias_cierre' => 0];
+$actions = ['total' => 0, 'ejecutadas' => 0, 'vencidas' => 0];
+if ($schemaReady) {
+    $checklists = mti_ind_scalar(
+        "SELECT COUNT(*) asignados,SUM(c.estado='COMPLETADO') completados"
+        . " FROM activos_mantenimiento_checklists c"
+        . " INNER JOIN activos_mantenimientos m ON m.id=c.mantenimiento_id"
+        . " WHERE m.fecha_programada BETWEEN '{$start}' AND '{$end}' AND c.estado<>'ANULADO'"
+    );
+    $findings = mti_ind_scalar(
+        "SELECT COUNT(*) total,SUM(estado='CERRADO') cerrados,"
+        . " SUM(estado NOT IN ('CERRADO','ANULADO')) abiertos,"
+        . " SUM(criticidad='CRITICA' AND estado NOT IN ('CERRADO','ANULADO')) criticos_abiertos,"
+        . " ROUND(AVG(CASE WHEN estado='CERRADO' THEN DATEDIFF(fecha_cierre,fecha_deteccion) END),1) dias_cierre"
+        . " FROM activos_mantenimiento_hallazgos"
+        . " WHERE estado<>'ANULADO' AND DATE(fecha_deteccion) BETWEEN '{$start}' AND '{$end}'"
+    );
+    $actions = mti_ind_scalar(
+        "SELECT COUNT(*) total,SUM(a.estado='EJECUTADA') ejecutadas,"
+        . " SUM(a.estado IN ('PENDIENTE','EN_PROCESO') AND a.fecha_compromiso<CURDATE()) vencidas"
+        . " FROM activos_mantenimiento_hallazgo_acciones a"
+        . " INNER JOIN activos_mantenimiento_hallazgos h ON h.id=a.hallazgo_id"
+        . " WHERE h.estado<>'ANULADO' AND DATE(h.fecha_deteccion) BETWEEN '{$start}' AND '{$end}'"
+    );
+}
+$checklistPct = mti_ind_pct($checklists['completados'] ?? 0, $checklists['asignados'] ?? 0);
+$findingPct = mti_ind_pct($findings['cerrados'] ?? 0, $findings['total'] ?? 0);
+$actionPct = mti_ind_pct($actions['ejecutadas'] ?? 0, $actions['total'] ?? 0);
+
+$quarterRows = find_by_sql(
+    "SELECT QUARTER(fecha_programada) trimestre,COUNT(*) programados,"
+    . " SUM(estado='COMPLETADO') completados,"
+    . " SUM(estado='COMPLETADO' AND fecha_ejecucion<=fecha_programada) a_tiempo"
+    . " FROM activos_mantenimientos WHERE estado<>'CANCELADO' AND YEAR(fecha_programada)={$year}"
+    . " GROUP BY QUARTER(fecha_programada) ORDER BY trimestre"
+);
+$quarterMap = [];
+foreach ($quarterRows as $row) $quarterMap[(int)$row['trimestre']] = $row;
+$overdueRows = find_by_sql(
+    "SELECT m.id,m.folio,m.fecha_programada,m.estado,m.prioridad,q.Host"
+    . " FROM activos_mantenimientos m INNER JOIN maquina q ON q.IdMaquina=m.IdMaquina"
+    . " WHERE m.estado NOT IN ('COMPLETADO','CANCELADO') AND m.fecha_programada<CURDATE()"
+    . " AND m.fecha_programada BETWEEN '{$start}' AND '{$end}'"
+    . " ORDER BY m.fecha_programada LIMIT 12"
+);
+$criticalRows = $schemaReady ? find_by_sql(
+    "SELECT h.id,h.codigo,h.titulo,h.criticidad,h.estado,h.fecha_deteccion,m.folio,q.Host"
+    . " FROM activos_mantenimiento_hallazgos h"
+    . " INNER JOIN activos_mantenimientos m ON m.id=h.mantenimiento_id"
+    . " INNER JOIN maquina q ON q.IdMaquina=m.IdMaquina"
+    . " WHERE h.estado NOT IN ('CERRADO','ANULADO') AND h.criticidad IN ('ALTA','CRITICA')"
+    . " AND DATE(h.fecha_deteccion) BETWEEN '{$start}' AND '{$end}'"
+    . " ORDER BY FIELD(h.criticidad,'CRITICA','ALTA'),h.fecha_deteccion LIMIT 12"
+) : [];
+
+$cards = [
+    ['title'=>'Cumplimiento de mantenimiento','value'=>$maintenancePct,'target'=>100,'detail'=>"{$completed} de {$programmed} programados",'icon'=>'fa-screwdriver-wrench'],
+    ['title'=>'Ejecución dentro de fecha','value'=>$onTimePct,'target'=>95,'detail'=>"{$onTime} de {$completed} completados",'icon'=>'fa-clock'],
+    ['title'=>'Checklists completados','value'=>$checklistPct,'target'=>100,'detail'=>(int)($checklists['completados']??0).' de '.(int)($checklists['asignados']??0).' asignados','icon'=>'fa-list-check'],
+    ['title'=>'Hallazgos cerrados','value'=>$findingPct,'target'=>90,'detail'=>(int)($findings['cerrados']??0).' de '.(int)($findings['total']??0).' detectados','icon'=>'fa-triangle-exclamation'],
+];
+
+include_once(__DIR__ . '/../../layouts/header.php');
+?>
+<style>
+:root{--ind-ink:#123746;--ind-teal:#137c8b;--ind-orange:#e58a32;--ind-paper:#f3f8f7}.ind-hero{border:0;border-radius:16px;color:#fff;background:linear-gradient(115deg,#102f3b,#126f7c 67%,#d78030);box-shadow:0 16px 38px rgba(18,55,70,.2)}.ind-card{height:100%;padding:18px;border:1px solid #dce8e6;border-radius:14px;background:#fff;box-shadow:0 6px 18px rgba(18,55,70,.07)}.ind-icon{display:flex;width:40px;height:40px;align-items:center;justify-content:center;border-radius:11px;background:#e8f4f2;color:var(--ind-teal)}.ind-value{font-size:31px;font-weight:900;color:var(--ind-ink)}.ind-meta{font-size:11px;color:#71838a}.ind-track{height:9px;border-radius:20px;background:#e6eceb;overflow:hidden}.ind-fill{height:100%;border-radius:20px}.ind-fill.success{background:#2a9d63}.ind-fill.warning{background:#e3a128}.ind-fill.danger{background:#d95656}.ind-table thead th{border:0;background:var(--ind-ink);color:#fff;font-size:10px;text-transform:uppercase}.ind-quarter{padding:15px;border:1px solid #dce8e6;border-radius:12px;background:var(--ind-paper)}.ind-quarter strong{font-size:24px;color:var(--ind-ink)}.ind-note{border-left:4px solid var(--ind-orange);background:#fff8ed}.ind-section{border:1px solid #dce8e6;border-radius:13px;overflow:hidden;background:#fff}.ind-section-title{padding:13px 16px;background:var(--ind-paper);color:var(--ind-ink);font-weight:800}
+</style>
+<section class="content-header pb-1"><div class="container-fluid d-flex justify-content-between align-items-center"><h1 class="h4 mb-0"><i class="fas fa-chart-line mr-2 text-info"></i>Indicadores de Mantenimiento TI</h1><a href="index.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left mr-1"></i>Volver</a></div></section>
+<section class="content"><div class="container-fluid">
+ <div class="card ind-hero mb-3"><div class="card-body d-lg-flex justify-content-between align-items-center"><div><div class="small text-uppercase font-weight-bold opacity-75">Control de gestión</div><h2 class="h4 font-weight-bold mb-1"><?=mti_ind_h($periodLabel)?></h2><div>Programación, ejecución, verificaciones y cierre de hallazgos.</div></div><form method="get" class="form-inline mt-3 mt-lg-0"><select name="anio" class="form-control mr-2"><?php for($y=(int)date('Y')+1;$y>=2023;$y--):?><option value="<?=$y?>" <?=$y===$year?'selected':''?>><?=$y?></option><?php endfor;?></select><select name="trimestre" class="form-control mr-2"><option value="0" <?=$quarter===0?'selected':''?>>Todo el año</option><?php for($q=1;$q<=4;$q++):?><option value="<?=$q?>" <?=$q===$quarter?'selected':''?>>Trimestre <?=$q?></option><?php endfor;?></select><button class="btn btn-light font-weight-bold"><i class="fas fa-filter mr-1"></i>Aplicar</button></form></div></div>
+ <?php if(!$schemaReady):?><div class="alert alert-warning">Los indicadores de checklist y hallazgos estarán disponibles cuando la migración esté completa.</div><?php endif;?>
+ <div class="row mb-3"><?php foreach($cards as $card):$tone=mti_ind_tone($card['value'],$card['target']);?><div class="col-md-6 col-xl-3 mb-3"><div class="ind-card"><div class="d-flex justify-content-between"><div class="ind-icon"><i class="fas <?=$card['icon']?>"></i></div><span class="badge badge-<?=$tone?> align-self-start">Meta <?=$card['target']?>%</span></div><div class="ind-value mt-2"><?=number_format($card['value'],1)?>%</div><div class="font-weight-bold"><?=mti_ind_h($card['title'])?></div><div class="ind-meta mb-2"><?=mti_ind_h($card['detail'])?></div><div class="ind-track"><div class="ind-fill <?=$tone?>" style="width:<?=min(100,$card['value'])?>%"></div></div></div></div><?php endforeach;?></div>
+ <div class="row mb-3"><div class="col-lg-8"><div class="ind-section h-100"><div class="ind-section-title"><i class="fas fa-calendar-alt mr-2 text-info"></i>Cumplimiento trimestral <?=$year?></div><div class="row p-3"><?php for($q=1;$q<=4;$q++):$row=$quarterMap[$q]??[];$p=(int)($row['programados']??0);$c=(int)($row['completados']??0);$pct=mti_ind_pct($c,$p);?><div class="col-6 col-md-3 mb-3"><div class="ind-quarter"><span class="small font-weight-bold">TRIMESTRE <?=$q?></span><strong class="d-block"><?=number_format($pct,1)?>%</strong><span class="small text-muted"><?=$c?> / <?=$p?> completados</span><div class="ind-track mt-2"><div class="ind-fill <?=mti_ind_tone($pct,100)?>" style="width:<?=min(100,$pct)?>%"></div></div></div></div><?php endfor;?></div></div></div><div class="col-lg-4 mt-3 mt-lg-0"><div class="ind-section h-100"><div class="ind-section-title"><i class="fas fa-gauge-high mr-2 text-warning"></i>Control operativo</div><div class="p-3"><div class="d-flex justify-content-between border-bottom py-2"><span>Órdenes vencidas</span><strong class="text-danger"><?=$overdue?></strong></div><div class="d-flex justify-content-between border-bottom py-2"><span>Hallazgos abiertos</span><strong><?= (int)($findings['abiertos']??0) ?></strong></div><div class="d-flex justify-content-between border-bottom py-2"><span>Críticos abiertos</span><strong class="text-danger"><?= (int)($findings['criticos_abiertos']??0) ?></strong></div><div class="d-flex justify-content-between border-bottom py-2"><span>Acciones ejecutadas</span><strong><?=number_format($actionPct,1)?>%</strong></div><div class="d-flex justify-content-between border-bottom py-2"><span>Acciones vencidas</span><strong class="text-danger"><?= (int)($actions['vencidas']??0) ?></strong></div><div class="d-flex justify-content-between py-2"><span>Promedio cierre hallazgo</span><strong><?=number_format((float)($findings['dias_cierre']??0),1)?> días</strong></div><div class="alert ind-note mt-3 mb-0 small"><strong>Lectura:</strong> cumplimiento = órdenes completadas / órdenes programadas no canceladas del periodo.</div></div></div></div></div>
+ <div class="row"><div class="col-lg-6 mb-3"><div class="ind-section"><div class="ind-section-title"><i class="fas fa-hourglass-end mr-2 text-danger"></i>Órdenes vencidas del periodo</div><div class="table-responsive"><table class="table table-sm table-hover ind-table mb-0"><thead><tr><th>Orden</th><th>Equipo</th><th>Fecha</th><th>Prioridad</th><th></th></tr></thead><tbody><?php foreach($overdueRows as $row):?><tr><td><?=mti_ind_h($row['folio'])?></td><td><?=mti_ind_h($row['Host'])?></td><td><?=date('d/m/Y',strtotime($row['fecha_programada']))?></td><td><?=mti_ind_h($row['prioridad'])?></td><td><a href="detalle.php?id=<?=(int)$row['id']?>" class="btn btn-xs btn-outline-info">Ver</a></td></tr><?php endforeach;?><?php if(!$overdueRows):?><tr><td colspan="5" class="text-center text-muted py-4">Sin órdenes vencidas.</td></tr><?php endif;?></tbody></table></div></div></div><div class="col-lg-6 mb-3"><div class="ind-section"><div class="ind-section-title"><i class="fas fa-triangle-exclamation mr-2 text-warning"></i>Hallazgos altos y críticos pendientes</div><div class="table-responsive"><table class="table table-sm table-hover ind-table mb-0"><thead><tr><th>Código</th><th>Equipo</th><th>Hallazgo</th><th>Criticidad</th><th></th></tr></thead><tbody><?php foreach($criticalRows as $row):?><tr><td><?=mti_ind_h($row['codigo'])?></td><td><?=mti_ind_h($row['Host'])?></td><td><?=mti_ind_h($row['titulo'])?></td><td><span class="badge badge-danger"><?=mti_ind_h($row['criticidad'])?></span></td><td><a href="hallazgo.php?id=<?=(int)$row['id']?>" class="btn btn-xs btn-outline-info">Ver</a></td></tr><?php endforeach;?><?php if(!$criticalRows):?><tr><td colspan="5" class="text-center text-muted py-4">Sin hallazgos altos o críticos pendientes.</td></tr><?php endif;?></tbody></table></div></div></div></div>
+</div></section>
+<?php include_once(__DIR__ . '/../../layouts/footer.php');?>

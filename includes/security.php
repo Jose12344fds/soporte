@@ -1,0 +1,291 @@
+<?php
+
+if (!function_exists('security_is_https')) {
+    function security_is_https(): bool
+    {
+        if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') {
+            return true;
+        }
+        if (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) {
+            return true;
+        }
+        if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+            return strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https';
+        }
+        return false;
+    }
+}
+
+if (!function_exists('security_csp_value')) {
+    function security_csp_value(): string
+    {
+        $parts = [
+            "default-src 'self'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "frame-ancestors 'self'",
+            "object-src 'none'",
+            "img-src 'self' data: blob: https://developer.api.autodesk.com",
+            "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://developer.api.autodesk.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://cdn.datatables.net https://code.jquery.com https://developer.api.autodesk.com",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdn.datatables.net https://cdnjs.cloudflare.com https://code.jquery.com https://developer.api.autodesk.com",
+            "connect-src 'self' https://cdn.jsdelivr.net https://cdn.datatables.net https://cdnjs.cloudflare.com https://code.jquery.com https://fonts.googleapis.com https://fonts.gstatic.com https://developer.api.autodesk.com https://*.autodesk.com",
+            "frame-src 'self' https://developer.api.autodesk.com https://*.autodesk.com",
+            "worker-src 'self' blob:",
+        ];
+
+        return implode('; ', $parts);
+    }
+}
+
+if (!function_exists('security_bootstrap')) {
+    function security_bootstrap(): void
+    {
+        if (PHP_SAPI === 'cli') {
+            return;
+        }
+
+        @ini_set('expose_php', '0');
+        @ini_set('session.use_only_cookies', '1');
+        @ini_set('session.use_strict_mode', '1');
+        @ini_set('session.use_trans_sid', '0');
+
+        if (session_status() === PHP_SESSION_NONE) {
+            $params = session_get_cookie_params();
+            $cookieOptions = [
+                'lifetime' => 0,
+                'path' => $params['path'] ?? '/',
+                'domain' => $params['domain'] ?? '',
+                'secure' => security_is_https(),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ];
+            session_set_cookie_params($cookieOptions);
+        }
+
+        if (!headers_sent()) {
+            header_remove('X-Powered-By');
+            header('X-Frame-Options: SAMEORIGIN');
+            header('X-Content-Type-Options: nosniff');
+            header('Referrer-Policy: strict-origin-when-cross-origin');
+            header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+            header('Content-Security-Policy: ' . security_csp_value());
+        }
+    }
+}
+
+if (!function_exists('csrf_token')) {
+    function csrf_token(): string
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return '';
+        }
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return (string)$_SESSION['csrf_token'];
+    }
+}
+
+if (!function_exists('csrf_input')) {
+    function csrf_input(): string
+    {
+        $token = htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8');
+        return '<input type="hidden" name="_csrf" value="' . $token . '">';
+    }
+}
+
+if (!function_exists('csrf_meta_tag')) {
+    function csrf_meta_tag(): string
+    {
+        $token = htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8');
+        return '<meta name="csrf-token" content="' . $token . '">';
+    }
+}
+
+if (!function_exists('csrf_request_token')) {
+    function request_raw_body(): string
+    {
+        static $cachedBody = null;
+        if ($cachedBody === null) {
+            $raw = file_get_contents('php://input');
+            $cachedBody = is_string($raw) ? $raw : '';
+        }
+        return $cachedBody;
+    }
+}
+
+if (!function_exists('request_json_body')) {
+    function request_json_body(): array
+    {
+        static $cachedJson = null;
+        if ($cachedJson !== null) {
+            return $cachedJson;
+        }
+
+        $cachedJson = [];
+        $contentType = strtolower(trim((string)($_SERVER['CONTENT_TYPE'] ?? '')));
+        if (strpos($contentType, 'application/json') === false) {
+            return $cachedJson;
+        }
+
+        $raw = request_raw_body();
+        if ($raw === '') {
+            return $cachedJson;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            $cachedJson = $decoded;
+        }
+
+        return $cachedJson;
+    }
+}
+
+if (!function_exists('csrf_request_token')) {
+    function csrf_request_token(): string
+    {
+        $headers = [
+            $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '',
+            $_SERVER['HTTP_X_XSRF_TOKEN'] ?? '',
+            $_POST['_csrf'] ?? '',
+            $_POST['csrf_token'] ?? '',
+        ];
+
+        foreach ($headers as $candidate) {
+            $value = trim((string)$candidate);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        $contentType = strtolower(trim((string)($_SERVER['CONTENT_TYPE'] ?? '')));
+        if (strpos($contentType, 'application/json') !== false) {
+            $decoded = request_json_body();
+            if ($decoded) {
+                $value = trim((string)($decoded['_csrf'] ?? $decoded['csrf_token'] ?? ''));
+                if ($value !== '') {
+                    return $value;
+                }
+            }
+        }
+
+        return '';
+    }
+}
+
+if (!function_exists('csrf_should_enforce')) {
+    function csrf_should_enforce(): bool
+    {
+        if (PHP_SAPI === 'cli') {
+            return false;
+        }
+
+        $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        if (!in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            return false;
+        }
+
+        $uri = (string)($_SERVER['REQUEST_URI'] ?? '');
+        $isApi = strpos($uri, '/api/') !== false;
+        $hasSessionUser = !empty($_SESSION['user_id']);
+
+        return $isApi || $hasSessionUser;
+    }
+}
+
+if (!function_exists('csrf_validate_or_fail')) {
+    function csrf_validate_or_fail(): void
+    {
+        if (!csrf_should_enforce()) {
+            return;
+        }
+
+        $sessionToken = csrf_token();
+        $requestToken = csrf_request_token();
+        if ($sessionToken !== '' && $requestToken !== '' && hash_equals($sessionToken, $requestToken)) {
+            return;
+        }
+
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+
+        http_response_code(419);
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+        }
+
+        $isApi = strpos((string)($_SERVER['REQUEST_URI'] ?? ''), '/api/') !== false;
+        if ($isApi) {
+            echo json_encode(['success' => false, 'error' => 'Token CSRF invalido o ausente'], JSON_UNESCAPED_UNICODE);
+        } else {
+            echo 'Token CSRF invalido o ausente';
+        }
+        exit;
+    }
+}
+
+if (!function_exists('external_asset_attrs')) {
+    function external_asset_attrs(string $url): string
+    {
+        static $integrities = [
+            'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css' => 'sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0',
+            'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css' => 'sha384-DyZ88mC6Up2uqS4h/KRgHuoeGwBcD4Ng9SiP4dIRy0EXTlnuz47vAwmeGwVChigm',
+            'https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css' => 'sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N',
+            'https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css' => 'sha384-qrt37eUXKQgF1p6OlpdB29OTyKryxbxdJHkvfVN4suujWnn6PibIvbnygcK4uJfA',
+            'https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap4.min.css' => 'sha384-EIJd7ZX8c0LtOlPdonGW/EcMobn3Zb7djetGIHr2QtvMwdz/6STt28HjViqL5LOu',
+            'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap4.min.css' => 'sha384-f89RBCpXIb8B0pmvO2fADSw3ZHEvAPLa2qgOF4azIIoo140I8FVDJw07g47TXNHe',
+            'https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap4.min.css' => 'sha384-GW7ce7Wk/Yh0PZXY964CvJ3+UrPGlQhusVWR49U0KOYBDpD2WtMRAlkchgtA9+Ki',
+            'https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css' => 'sha384-dCW5imOdApH6OwpFau8cZNKjqVbJYnCA5q+8YsMYP3XwXKsV6Jfz1u6MZLnXaBsS',
+            'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css' => 'sha384-OXVF05DQEe311p6ohU11NwlnX08FzMCsyoXzGOaL+83dKAb3qS17yZJxESl8YrJQ',
+            'https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@1.5.2/dist/select2-bootstrap4.min.css' => 'sha384-dZ/kdA+7jiSms5Z+NkfRPANv1sHvWqS7e51A6ywK9wsJztsDG2q4gA4Ltui+/1yW',
+            'https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css' => 'sha384-vIQIPaHJRqkO8xhnLxSZ0rHF6LyiWXbLF3grsa9pv9yDFyOPGrE1teHOuRNMJoZs',
+            'https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js' => 'sha384-UG8ao2jwOWB7/oDdObZc6ItJmwUkR/PfMyt9Qs5AwX7PsnYn1CRKCTWyncPTWvaS',
+            'https://code.jquery.com/ui/1.13.2/jquery-ui.min.js' => 'sha384-4D3G3GikQs6hLlLZGdz5wLFzuqE9v4yVGAcOH86y23JqBDPzj9viv0EqyfIa6YUL',
+            'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js' => 'sha384-d3UHjPdzJkZuk5H3qKYMLRyWLAQBJbby2yr2Q58hXXtAGF8RSNO9jpLDlKKPv5v3',
+            'https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js' => 'sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct',
+            'https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js' => 'sha384-GzAyPc+9MeNdsDGfpe/gNkeDXXSbdZdY0yKEFBGFxqmq/97NJ92k5oyF1YPOOhm5',
+            'https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js' => 'sha384-k5vbMeKHbxEZ0AEBTSdR7UjAgWCcUfrS8c0c5b2AfIh7olfhNkyCZYwOfzOQhauK',
+            'https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap4.min.js' => 'sha384-vCX+UFRnh1Gp0hr9dL82snXI1HvdBaApGHMjbewoGQ69VkYcHt9jvTy+Q4CAWwPX',
+            'https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js' => 'sha384-VUnyCeQcqiiTlSM4AISHjJWKgLSM5VSyOeipcD9S/ybCKR3OhChZrPPjjrLfVV0y',
+            'https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap4.min.js' => 'sha384-OOkn5Krc37A+2dQETF0WjM74kdj9ZsNH5myIgTgDeCm6PDGgKRELxvACGYjTuYLc',
+            'https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js' => 'sha384-BsCICKJ3PaoBhw3UZcWM2TVGBGWRXEUinsEWpM2z5ZReY3QjfTxR5xghRpJz7XFC',
+            'https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap4.min.js' => 'sha384-PwVcuOthq4E8AsFzUFglGmuSORMjxLGL8ZArn5KJdw4SNRsvixgKcdkurug7LYrJ',
+            'https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js' => 'sha384-On4D3nN2gGDU45v05twd+TTLH8PL+2gbsGVpnKEpSfv7pDd1pgEJxxc4k7iWeg9d',
+            'https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js' => 'sha384-f5wX6gS38xMVGrwiXWKR7VijcBONISoTGfHF3N7yTwGrmvHaMHB4lq+VKxeZID10',
+            'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js' => 'sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG',
+            'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js' => 'sha384-VFQrHzqBh5qiJIU0uGU5CIW3+OWpdGGJM9LBnGbuIH2mkICcFZ7lPd/AAtI7SNf7',
+            'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js' => 'sha384-/RlQG9uf0M2vcTw3CX7fbqgbj/h8wKxw7C3zu9/GxcBPRKOEcESxaxufwRXqzq6n',
+            'https://cdn.jsdelivr.net/npm/sweetalert2@11' => 'sha384-nLoOnA/BDh8A/jxqtckg4DumuCGOBYUnNJLZdQz/zfYNp3wcjGSoWTAzgko06G/2',
+        ];
+
+        if (strpos($url, 'http://') === 0 || strpos($url, 'https://') === 0) {
+            $attrs = ['crossorigin="anonymous"'];
+            if (isset($integrities[$url])) {
+                $attrs[] = 'integrity="' . $integrities[$url] . '"';
+                $attrs[] = 'referrerpolicy="no-referrer"';
+            }
+            return ' ' . implode(' ', $attrs);
+        }
+
+        return '';
+    }
+}
+
+if (!function_exists('stylesheet_tag')) {
+    function stylesheet_tag(string $url): string
+    {
+        $safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+        return '<link rel="stylesheet" href="' . $safeUrl . '"' . external_asset_attrs($url) . '>';
+    }
+}
+
+if (!function_exists('script_tag')) {
+    function script_tag(string $url): string
+    {
+        $safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+        return '<script src="' . $safeUrl . '"' . external_asset_attrs($url) . '></script>';
+    }
+}

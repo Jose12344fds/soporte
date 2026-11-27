@@ -1,0 +1,259 @@
+<?php
+/**
+ * Notificaciones de la Mesa de Ayuda mediante la configuracion SMTP activa.
+ * Los errores se auditan y nunca interrumpen la gestion del ticket.
+ */
+
+function inc_mail_read($socket): string
+{
+    $data = '';
+    while (($line = fgets($socket, 515)) !== false) {
+        $data .= $line;
+        if (strlen($line) >= 4 && $line[3] === ' ') break;
+    }
+    return $data;
+}
+
+function inc_mail_command($socket, string $command, array $validCodes): void
+{
+    fwrite($socket, $command."\r\n");
+    $response = inc_mail_read($socket);
+    if (!in_array(substr($response, 0, 3), $validCodes, true)) {
+        throw new RuntimeException('Respuesta SMTP no esperada: '.trim($response));
+    }
+}
+
+function inc_mail_send(array $smtp, string $email, string $name, string $subject, string $html, ?array $attachment = null, array $inlineImages = []): void
+{
+    $host = trim((string)($smtp['smtp_host'] ?? ''));
+    $port = (int)($smtp['smtp_port'] ?? 587);
+    $secure = strtolower(trim((string)($smtp['smtp_secure'] ?? 'tls')));
+    $user = trim((string)($smtp['smtp_user'] ?? ''));
+    $password = (string)($smtp['smtp_pass'] ?? '');
+    $from = trim((string)($smtp['from_email'] ?? $user));
+    $fromName = trim((string)($smtp['from_name'] ?? 'Mesa de Ayuda TI'));
+    if ($host === '' || $from === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('Configuracion SMTP o destinatario incompleto.');
+    }
+
+    $remote = ($secure === 'ssl' ? 'ssl://' : '').$host.':'.$port;
+    $socket = @stream_socket_client($remote, $number, $error, 10, STREAM_CLIENT_CONNECT);
+    if (!$socket) throw new RuntimeException('No se pudo conectar al servidor de correo.');
+    stream_set_timeout($socket, 10);
+    try {
+        if (substr(inc_mail_read($socket), 0, 3) !== '220') throw new RuntimeException('El servidor SMTP no respondio correctamente.');
+        inc_mail_command($socket, 'EHLO soporte-tama', ['250']);
+        if ($secure === 'tls') {
+            inc_mail_command($socket, 'STARTTLS', ['220']);
+            if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) throw new RuntimeException('No se pudo iniciar TLS.');
+            inc_mail_command($socket, 'EHLO soporte-tama', ['250']);
+        }
+        if ((int)($smtp['smtp_auth'] ?? 1) === 1) {
+            inc_mail_command($socket, 'AUTH LOGIN', ['334']);
+            inc_mail_command($socket, base64_encode($user), ['334']);
+            inc_mail_command($socket, base64_encode($password), ['235']);
+        }
+        inc_mail_command($socket, 'MAIL FROM:<'.$from.'>', ['250']);
+        inc_mail_command($socket, 'RCPT TO:<'.$email.'>', ['250', '251']);
+        inc_mail_command($socket, 'DATA', ['354']);
+
+        $encode = static fn(string $text): string => '=?UTF-8?B?'.base64_encode($text).'?=';
+        $messageDomain = substr(strrchr($from, '@') ?: '@tama.pe', 1) ?: 'tama.pe';
+        $headers = [
+            'From: '.$encode($fromName).' <'.$from.'>',
+            'To: '.$encode($name !== '' ? $name : $email).' <'.$email.'>',
+            'Subject: '.$encode($subject),
+            'MIME-Version: 1.0',
+            'Date: '.date(DATE_RFC2822),
+            'Message-ID: <'.bin2hex(random_bytes(12)).'@'.$messageDomain.'>',
+            'X-Mailer: TAMA Mesa de Ayuda TI',
+            'Content-Language: es-PE',
+        ];
+        if (!empty($smtp['reply_to'])) $headers[] = 'Reply-To: '.trim((string)$smtp['reply_to']);
+        $inlineImages = array_values(array_filter($inlineImages, static fn(array $image): bool => is_file((string)($image['path'] ?? ''))));
+        $hasAttachment = $attachment && is_file((string)($attachment['path'] ?? ''));
+        if ($hasAttachment || $inlineImages) {
+            $mixedBoundary = '=_TAMA_MIXED_'.bin2hex(random_bytes(10));
+            $relatedBoundary = '=_TAMA_RELATED_'.bin2hex(random_bytes(10));
+            $headers[] = 'Content-Type: '.($hasAttachment ? 'multipart/mixed; boundary="'.$mixedBoundary.'"' : 'multipart/related; boundary="'.$relatedBoundary.'"');
+            $body = '';
+            if ($hasAttachment) $body .= '--'.$mixedBoundary."\r\nContent-Type: multipart/related; boundary=\"".$relatedBoundary."\"\r\n\r\n";
+            $body .= '--'.$relatedBoundary."\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode($html));
+            foreach ($inlineImages as $image) {
+                $imageName = preg_replace('/[^A-Za-z0-9._-]/u', '_', basename((string)($image['name'] ?? 'imagen.png')));
+                $imageType = trim((string)($image['type'] ?? 'image/png')) ?: 'image/png';
+                $contentId = preg_replace('/[^A-Za-z0-9._-]/', '', (string)($image['cid'] ?? 'inline-image')) ?: 'inline-image';
+                $body .= "\r\n--".$relatedBoundary."\r\nContent-Type: ".$imageType.'; name="'.$imageName."\"\r\n";
+                $body .= "Content-Transfer-Encoding: base64\r\nContent-ID: <".$contentId.">\r\nContent-Disposition: inline; filename=\"".$imageName."\"\r\n\r\n";
+                $body .= chunk_split(base64_encode((string)file_get_contents((string)$image['path'])));
+            }
+            $body .= "\r\n--".$relatedBoundary."--";
+            if ($hasAttachment) {
+                $safeName = preg_replace('/[^A-Za-z0-9._-]/u', '_', basename((string)($attachment['name'] ?? 'adjunto')));
+                $mime = trim((string)($attachment['type'] ?? 'application/octet-stream')) ?: 'application/octet-stream';
+                $body .= "\r\n--".$mixedBoundary."\r\nContent-Type: ".$mime.'; name="'.$safeName."\"\r\n";
+                $body .= "Content-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"".$safeName."\"\r\n\r\n";
+                $body .= chunk_split(base64_encode((string)file_get_contents((string)$attachment['path'])))."\r\n--".$mixedBoundary."--";
+            }
+            $message = implode("\r\n", $headers)."\r\n\r\n".$body;
+        } else {
+            $headers[] = 'Content-Type: text/html; charset=UTF-8';
+            $headers[] = 'Content-Transfer-Encoding: base64';
+            $message = implode("\r\n", $headers)."\r\n\r\n".chunk_split(base64_encode($html));
+        }
+        fwrite($socket, preg_replace('/^\./m', '..', $message)."\r\n.\r\n");
+        if (substr(inc_mail_read($socket), 0, 3) !== '250') throw new RuntimeException('El servidor SMTP rechazo el mensaje.');
+        inc_mail_command($socket, 'QUIT', ['221']);
+    } finally {
+        if (is_resource($socket)) fclose($socket);
+    }
+}
+
+function inc_mail_config(): ?array
+{
+    global $db;
+    try {
+        $result = $db->query("SELECT * FROM correo_smtp_config WHERE activo=1 ORDER BY id DESC LIMIT 1");
+        return $db->num_rows($result) ? $db->fetch_assoc($result) : null;
+    } catch (Throwable $error) {
+        return null;
+    }
+}
+
+function inc_mail_audit(int $ticketId, string $event, string $email, string $subject, string $status, string $detail = ''): void
+{
+    global $db;
+    try {
+        $db->query("INSERT INTO inc_notificaciones (IdTicket,Evento,CorreoDestino,Asunto,Estado,Detalle)
+            VALUES ({$ticketId},'".$db->escape($event)."','".$db->escape($email)."','".$db->escape($subject)."','".$db->escape($status)."','".$db->escape(mb_substr($detail, 0, 1000))."')");
+    } catch (Throwable $error) {
+        error_log('Incidencias correo: no se pudo auditar el envio.');
+    }
+}
+
+function inc_mail_ticket_url(int $ticketId): string
+{
+    require_once dirname(__DIR__, 2) . '/config/urls.php';
+    return app_url('/modules/incidencias/detalle.php?id=' . $ticketId);
+}
+
+function inc_mail_html(array $ticket, string $heading, string $message, string $note = '', string $solution = ''): string
+{
+    $e = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+    $priority = (string)($ticket['Prioridad'] ?? 'MEDIA');
+    $status = (string)($ticket['Estado'] ?? 'NUEVO');
+    $priorityColors = ['CRITICA'=>'#c62828','ALTA'=>'#e05a32','MEDIA'=>'#d99a18','BAJA'=>'#278a62'];
+    $statusColors = ['NUEVO'=>'#286fb4','ASIGNADO'=>'#7653a6','EN_PROGRESO'=>'#c18412','PENDIENTE_USUARIO'=>'#d06c32','PENDIENTE_TERCERO'=>'#d06c32','RESUELTO'=>'#21865b','CERRADO'=>'#526c78','CANCELADO'=>'#7a858b'];
+    // El logo viaja incrustado en el correo. Esto evita que Outlook bloquee
+    // la imagen por provenir de una URL HTTP o de una dirección IP interna.
+    $logo = 'cid:tama-logo';
+    $date = !empty($ticket['FechaRegistro']) ? date('d/m/Y H:i', strtotime((string)$ticket['FechaRegistro'])) : date('d/m/Y H:i');
+    $equipment = trim((string)($ticket['Host'] ?? ''));
+    if ($equipment !== '' && !empty($ticket['Tipo_Activo'])) $equipment .= ' / '.(string)$ticket['Tipo_Activo'];
+    if ($equipment === '') $equipment = 'Sin equipo relacionado';
+    $detailBlocks = '';
+    if ($note !== '') $detailBlocks .= '<tr><td style="padding:0 28px 16px"><div style="padding:15px 17px;background:#edf7fa;border-left:4px solid #128698;border-radius:5px"><div style="font-size:11px;font-weight:bold;color:#128698;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Respuesta u observacion</div><div style="font-size:14px;line-height:1.55;color:#253740">'.nl2br($e($note)).'</div></div></td></tr>';
+    if ($solution !== '') $detailBlocks .= '<tr><td style="padding:0 28px 16px"><div style="padding:15px 17px;background:#eef9f2;border-left:4px solid #2a9464;border-radius:5px"><div style="font-size:11px;font-weight:bold;color:#21865b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Solucion aplicada</div><div style="font-size:14px;line-height:1.55;color:#253740">'.nl2br($e($solution)).'</div></div></td></tr>';
+    $description = trim((string)($ticket['Descripcion'] ?? ''));
+    $descriptionBlock = $description !== '' ? '<tr><td style="padding:0 28px 16px"><div style="padding:14px 16px;background:#f7f9fa;border:1px solid #e5ebee;border-radius:5px"><div style="font-size:11px;font-weight:bold;color:#6b7b84;text-transform:uppercase;margin-bottom:6px">Detalle registrado</div><div style="font-size:13px;line-height:1.5;color:#384b55">'.nl2br($e($description)).'</div></div></td></tr>' : '';
+    return '<!doctype html><html><body style="margin:0;padding:0;background:#edf2f4;font-family:Arial,Helvetica,sans-serif;color:#243640"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#edf2f4"><tr><td align="center" style="padding:28px 12px"><table role="presentation" width="680" cellspacing="0" cellpadding="0" style="width:100%;max-width:680px;background:#fff;border:1px solid #dbe5e8;border-radius:10px;overflow:hidden;box-shadow:0 4px 18px rgba(19,55,67,.10)"><tr><td style="padding:18px 26px;background:#103b49"><table role="presentation" width="100%"><tr><td width="150"><img src="'.$e($logo).'" alt="TAMA Ingenieros" width="135" style="display:block;max-width:135px;height:auto;background:#fff;padding:7px;border-radius:5px"></td><td align="right" style="color:#fff"><div style="font-size:11px;letter-spacing:1.2px;color:#a9dce3">SISTEMA DE SOPORTE TI</div><div style="font-size:20px;font-weight:bold;margin-top:5px">Mesa de Ayuda TI</div></td></tr></table></td></tr><tr><td style="padding:24px 28px 16px"><div style="font-size:22px;font-weight:bold;color:#183f4b">'.$e($heading).'</div><div style="margin-top:8px;font-size:14px;line-height:1.5;color:#5e7079">'.$e($message).'</div></td></tr><tr><td style="padding:0 28px 18px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #dfe8eb;border-radius:7px"><tr><td style="padding:14px 16px;border-bottom:1px solid #e7edef"><div style="font-size:11px;color:#71818a;text-transform:uppercase">Ticket</div><div style="font-size:18px;font-weight:bold;color:#128698">'.$e($ticket['Folio'] ?? '').'</div></td><td style="padding:14px 16px;border-bottom:1px solid #e7edef;text-align:right"><span style="display:inline-block;padding:6px 10px;border-radius:14px;background:'.($statusColors[$status] ?? '#607d86').';color:#fff;font-size:11px;font-weight:bold">'.$e(inc_status_label($status)).'</span></td></tr><tr><td colspan="2" style="padding:13px 16px;border-bottom:1px solid #e7edef"><div style="font-size:11px;color:#71818a;text-transform:uppercase">Asunto</div><div style="font-size:15px;font-weight:bold;margin-top:3px">'.$e($ticket['Titulo'] ?? '').'</div></td></tr><tr><td style="padding:12px 16px;border-bottom:1px solid #e7edef"><b>Solicitante:</b> '.$e($ticket['SolicitanteNombre'] ?? '').'</td><td style="padding:12px 16px;border-bottom:1px solid #e7edef"><b>Fecha:</b> '.$e($date).'</td></tr><tr><td style="padding:12px 16px"><b>Equipo:</b> '.$e($equipment).'</td><td style="padding:12px 16px"><b>Prioridad:</b> <span style="color:'.($priorityColors[$priority] ?? '#607d86').';font-weight:bold">'.$e(inc_priority_label($priority)).'</span></td></tr></table></td></tr>'.$descriptionBlock.$detailBlocks.'<tr><td align="center" style="padding:4px 28px 26px"><a href="'.$e(inc_mail_ticket_url((int)$ticket['IdTicket'])).'" style="display:inline-block;padding:12px 22px;background:#128698;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold">Abrir ticket en el sistema</a><div style="margin-top:15px;font-size:11px;line-height:1.45;color:#7b8990">Responda y consulte el historial desde el portal. Este correo forma parte de la trazabilidad de la atencion.</div></td></tr><tr><td style="padding:12px 24px;background:#f4f7f8;text-align:center;font-size:10px;color:#86939a">Sistema Integrado de Gestion - Tecnologia de Informacion</td></tr></table></td></tr></table></body></html>';
+}
+function inc_mail_deliver(array $ticket, array $recipient, string $event, string $subject, string $heading, string $message, string $note = '', string $solution = ''): bool
+{
+    $email = trim((string)($recipient['correo'] ?? ''));
+    $name = trim((string)($recipient['name'] ?? $email));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        inc_mail_audit((int)$ticket['IdTicket'], $event, $email, $subject, 'OMITIDO', 'Destinatario sin correo valido.');
+        return false;
+    }
+    try {
+        $smtp = inc_mail_config();
+        if (!$smtp) throw new RuntimeException('No existe configuracion SMTP activa.');
+        $logoPath = dirname(__DIR__, 2).'/assets/img/logo.png';
+        $inlineImages = is_file($logoPath) ? [[
+            'path' => $logoPath,
+            'name' => 'logo-tama.png',
+            'type' => 'image/png',
+            'cid' => 'tama-logo',
+        ]] : [];
+        inc_mail_send(
+            $smtp,
+            $email,
+            $name,
+            $subject,
+            inc_mail_html($ticket, $heading, $message, $note, $solution),
+            null,
+            $inlineImages
+        );
+        inc_mail_audit((int)$ticket['IdTicket'], $event, $email, $subject, 'ENVIADO');
+        return true;
+    } catch (Throwable $error) {
+        inc_mail_audit((int)$ticket['IdTicket'], $event, $email, $subject, 'ERROR', $error->getMessage());
+        return false;
+    }
+}
+
+function inc_notify_support(array $ticket, string $event, string $note = ''): void
+{
+    $assignedId = (int)($ticket['AsignadoA'] ?? 0);
+    $recipientFilter = $assignedId > 0 ? "id={$assignedId}" : "es_personal_ti=1";
+    $recipients = find_by_sql("SELECT id,name,correo FROM users WHERE status=1 AND {$recipientFilter} AND TRIM(COALESCE(correo,''))<>'' ORDER BY id");
+    $subject = '['.(string)$ticket['Folio'].'] Nuevo ticket pendiente de atencion';
+    if ($event === 'RESPUESTA_USUARIO') $subject = '['.(string)$ticket['Folio'].'] El colaborador respondio';
+    foreach ($recipients as $recipient) {
+        inc_mail_deliver($ticket, $recipient, $event, $subject, $event === 'CREACION' ? 'Nuevo ticket sin atender' : 'Nueva respuesta del colaborador', $event === 'CREACION' ? 'Se registro un nuevo ticket y requiere revision de Soporte TI.' : 'El colaborador agrego informacion al ticket.', $note);
+    }
+}
+
+function inc_notify_requester(array $ticket, string $event, string $note = '', string $solution = ''): bool
+{
+    global $db;
+    $recipient = [
+        'name' => trim((string)($ticket['SolicitanteNombre'] ?? 'Colaborador')),
+        'correo' => trim((string)($ticket['SolicitanteCorreo'] ?? '')),
+    ];
+
+    // Consultar el perfil vigente: el correo pudo agregarse o corregirse
+    // después de que el ticket fue registrado.
+    $requesterId = (int)($ticket['SolicitanteId'] ?? 0);
+    if ($requesterId > 0) {
+        $users = find_by_sql("SELECT name,correo FROM users WHERE id={$requesterId} LIMIT 1");
+        if ($users) {
+            $liveName = trim((string)($users[0]['name'] ?? ''));
+            $liveEmail = trim((string)($users[0]['correo'] ?? ''));
+            if ($liveName !== '') $recipient['name'] = $liveName;
+            if (filter_var($liveEmail, FILTER_VALIDATE_EMAIL)) {
+                $recipient['correo'] = $liveEmail;
+                if ($liveEmail !== trim((string)($ticket['SolicitanteCorreo'] ?? ''))) {
+                    try {
+                        $db->query("UPDATE inc_tickets SET SolicitanteCorreo='".$db->escape($liveEmail)."' WHERE IdTicket=".(int)$ticket['IdTicket']);
+                    } catch (Throwable $error) {
+                        error_log('Incidencias correo: no se pudo sincronizar el correo del solicitante.');
+                    }
+                }
+            }
+        }
+    }
+
+    $headings = [
+        'CREACION' => 'Ticket recibido',
+        'RESPUESTA_TI' => 'Nueva comunicación de Soporte TI',
+        'CAMBIO_ESTADO' => 'Estado actualizado: '.inc_status_label((string)$ticket['Estado']),
+        'LLAMADO_USUARIO' => 'Soporte TI solicita su respuesta',
+    ];
+    $heading = $headings[$event] ?? 'Actualización del ticket';
+    $message = $event === 'RESPUESTA_TI'
+        ? 'Hola '.$recipient['name'].', Soporte TI publicó una nueva comunicación en tu ticket. Revísala y responde desde el portal si necesitas agregar información.'
+        : 'Hola '.$recipient['name'].', tu solicitud tiene una nueva actualización.';
+
+    return inc_mail_deliver(
+        $ticket,
+        $recipient,
+        $event,
+        '['.(string)$ticket['Folio'].'] '.$heading,
+        $heading,
+        $message,
+        $note,
+        $solution
+    );
+}

@@ -1,0 +1,601 @@
+﻿{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:06",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Servicio de inspección de red de Antivirus de Microsoft Defender entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:06",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Configuración de Escritorio remoto entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:05",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Ayudante para el inicio de sesión de cuenta Microsoft entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:05",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Propagación de certificados entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:05",
+  "CodigoEvento": "117",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Eliminar 0xFF00000220000001 de grupo de direcciones URL. Estado 0x0. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:05",
+  "CodigoEvento": "115",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se quitaron todas las direcciones URL del grupo de direcciones URL 0xFF00000220000001. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:04",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:3392/rdp/) al grupo de direcciones URL (0xFF00000220000001). Estado: 0xC0000035. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:03",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:3392/rdp/) al grupo de direcciones URL (0xFF00000220000001). Estado: 0xC0000035. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:02",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:3392/rdp/) al grupo de direcciones URL (0xFF00000220000001). Estado: 0xC0000035. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:02",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio Tssdis entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:02",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio TScPubRPC entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:02",
+  "CodigoEvento": "7026",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El siguiente controlador de inicio del sistema o de inicio del arranque no se cargó:  dam uiomap"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:02",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio MSSQL$MICROSOFT##WID entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:02",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio DiagTrack entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:01",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:3392/rdp/) al grupo de direcciones URL (0xFF00000220000001). Estado: 0xC0000035. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:01",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio WSAIFabricSvc entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:01",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio ClipSVC entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:01",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio camsvc entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:01",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio AppXSvc entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:01",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio StateRepository entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:01",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio MSSQL$SQLEXPRESS entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:14:00",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:3392/rdp/) al grupo de direcciones URL (0xFF00000220000001). Estado: 0xC0000035. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:59",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio wuauserv entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:59",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:3392/rdp/) al grupo de direcciones URL (0xFF00000220000001). Estado: 0xC0000035. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:58",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:3392/rdp/) al grupo de direcciones URL (0xFF00000220000001). Estado: 0xC0000035. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:58",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio [MSS] SW_TAMA_FE entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:58",
+  "CodigoEvento": "0",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-TerminalServices-Licensing",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se inició el servicio Administración de licencias de Escritorio remoto."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:58",
+  "CodigoEvento": "18",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-TerminalServices-Licensing",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servidor de licencias de Escritorio remoto "WS2025SAP" no se ha activado, por lo que solo emitirá licencias temporales. Para emitir licencias permanentes, se debe activar el servidor de licencias de Escritorio remoto."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:58",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio TermServLicensing entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:57",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:3392/rdp/) al grupo de direcciones URL (0xFF00000220000001). Estado: 0xC0000035. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:57",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio SQLTELEMETRY$SQLEXPRESS entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:57",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio SBOClientAgent entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:57",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio DoSvc entró en estado "detenido"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio WinDefend entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:3392/rdp/) al grupo de direcciones URL (0xFF00000220000001). Estado: 0xC0000035. Id. de proceso 0x5CC ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio StorSvc entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio WinRM entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:5985/wsman/) al grupo de direcciones URL (0xFD00000420000001). Estado: 0x0. Id. de proceso 0x1068 ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://+:47001/wsman/) al grupo de direcciones URL (0xFD00000420000001). Estado: 0x0. Id. de proceso 0x1068 ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-20  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio W3SVC entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://*:6591/) al grupo de direcciones URL (0xFF00000520000001). Estado: 0x0. Id. de proceso 0x1054 ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-18  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "111",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Crear grupo de direcciones URL 0xFF00000520000001. Estado 0x0. Id. de proceso 0x1054 ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-18  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "113",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Se intentó agregar la dirección URL (http://*:80/) al grupo de direcciones URL (0xFF00000620000001). Estado: 0x0. Id. de proceso 0x1054 ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-18  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "111",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-HttpService",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "Crear grupo de direcciones URL 0xFF00000620000001. Estado 0x0. Id. de proceso 0x1054 ruta de acceso ejecutable \Device\HarddiskVolume3\Windows\System32\svchost.exe, S-1-5-18  de usuario"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio WIDWriter entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio WAS entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio LanmanServer entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "134",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Microsoft-Windows-Time-Service",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "NtpClient no pudo establecer un sistema del mismo nivel manual para usar como origen de la hora debido a un error de resolución de DNS en 'time.windows.com,0x8'. NtpClient lo intentará de nuevo dentro de 15 minutos y doblará el intervalo de reintento en adelante. Error: Host desconocido. (0x80072AF9)"
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio mpssvc entró en estado "en ejecución"."
+}
+
+{
+  "Fuente": "WINDOWS",
+  "FechaEvento": "2026-11-11 17:13:56",
+  "CodigoEvento": "7036",
+  "Severidad": "INFORMACION",
+  "Proveedor": "Service Control Manager",
+  "HostOrigen": "WS2025SAP",
+  "IPOrigen": "192.168.4.32",
+  "Titulo": "Evento Windows",
+  "Mensaje": "El servicio IKEEXT entró en estado "en ejecución"."
+}
+
+

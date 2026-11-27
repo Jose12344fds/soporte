@@ -1,0 +1,69 @@
+<?php
+/**
+ * Valida el cierre completo de una selección de semanas de un mismo proceso.
+ * Recibe todas las semanas (abiertas y cerradas) del proceso, bajo bloqueo.
+ */
+function validarCierreSemanasReporte(array $semanas, array $seleccionadas, array $grupo): array
+{
+    $contexto = 'Proyecto ' . $grupo[1] . ', ítem ' . $grupo[2] . ', proceso ' . $grupo[3] . ': ';
+    $elegidas = [];
+    foreach ($seleccionadas as $fila) {
+        $elegidas[json_encode([(int)$fila[4], trim((string)$fila[5])])] = true;
+    }
+    $abiertas = [];
+    $aCerrar = [];
+    $fisico = 0.0;
+    $programado = 0.0;
+    foreach ($semanas as $semana) {
+        $fisico += (float)($semana['AvanceReal'] ?? 0);
+        $programado += (float)($semana['Avance'] ?? 0);
+        if ((int)$semana['Estado'] !== 1) continue;
+        $abiertas[] = $semana;
+        $clave = json_encode([(int)$semana['Aniio'], trim((string)$semana['Semana'])]);
+        if (isset($elegidas[$clave])) $aCerrar[] = $semana;
+    }
+    if (count($aCerrar) !== count($seleccionadas)) {
+        throw new RuntimeException($contexto . 'la selección cambió o contiene semanas duplicadas. Actualiza el reporte.');
+    }
+    foreach ($aCerrar as $semana) {
+        if ((float)($semana['AvanceReal'] ?? 0) <= 0) {
+            throw new RuntimeException($contexto . 'la semana ' . $semana['Semana'] . '/' . $semana['Aniio']
+                . ' tiene avance físico en cero. Registra un avance físico antes de cerrarla. No se cerró ninguna semana.');
+        }
+    }
+    // Evaluar el lote completo: seleccionar las últimas dos semanas también
+    // constituye el cierre de la última semana abierta del proceso.
+    if (count($aCerrar) === count($abiertas)) {
+        if (round(abs($fisico - 100), 6) > 0.01) {
+            throw new RuntimeException($contexto . 'para cerrar las últimas semanas, el avance físico acumulado debe ser 100 %. Actualmente es '
+                . number_format($fisico, 2) . ' %. No se cerró ninguna semana.');
+        }
+        if (round(abs($programado - 100), 6) > 0.01) {
+            throw new RuntimeException($contexto . 'para cerrar las últimas semanas, PROG.HH acumulado debe ser 100 %. Actualmente es '
+                . number_format($programado, 2) . ' %. No se cerró ninguna semana.');
+        }
+    }
+    $avisos = [];
+    foreach ($aCerrar as $actual) {
+        $posteriores = [];
+        $previas = [];
+        $fechaActual = [(int)$actual['Aniio'], (int)$actual['Semana']];
+        foreach ($abiertas as $otra) {
+            if ((float)($otra['AvanceReal'] ?? 0) > 0) continue;
+            $fechaOtra = [(int)$otra['Aniio'], (int)$otra['Semana']];
+            $etiqueta = $otra['Semana'] . '/' . $otra['Aniio'];
+            if ($fechaOtra > $fechaActual) $posteriores[] = $etiqueta;
+            if ($fechaOtra < $fechaActual) $previas[] = $etiqueta;
+        }
+        if ($fisico >= 99.99 && $posteriores) {
+            throw new RuntimeException($contexto . 'el avance físico acumulado ya es ' . number_format($fisico, 2)
+                . ' %, pero hay semanas posteriores con avance físico en cero: ' . implode(', ', $posteriores)
+                . '. Revisa esas filas y reprograma PROG.HH antes del cierre. No se cerró ninguna semana.');
+        }
+        if ($posteriores || $previas) {
+            $avisos[] = $contexto . 'hay semanas abiertas con avance físico en cero: '
+                . implode(', ', array_merge($previas, $posteriores)) . '. Revisa su programación.';
+        }
+    }
+    return array_values(array_unique($avisos));
+}

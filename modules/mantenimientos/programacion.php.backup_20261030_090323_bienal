@@ -1,0 +1,1588 @@
+<?php
+$page_title = 'Programacion de Mantenimiento';
+require_once(__DIR__ . '/../../includes/load.php');
+require_once(__DIR__ . '/../../config/app.php');
+require_permiso('mantenimientos', 'ver');
+include_once(__DIR__ . '/../../layouts/header.php');
+?>
+
+<style>
+.badge-estado-Pendiente { background:#ffc107; color:#000; }
+.badge-estado-Ejecutado { background:#28a745; color:#fff; }
+.badge-estado-Vencido { background:#dc3545; color:#fff; }
+.badge-estado-Cancelado { background:#6c757d; color:#fff; }
+.badge-estado-Ejecutado-fuera-de-fecha { background:#fd7e14; color:#fff; }
+.badge-tipo-PREV { background:#17a2b8; color:#fff; }
+.badge-tipo-CORR { background:#dc3545; color:#fff; }
+.badge-tipo-PRED { background:#6f42c1; color:#fff; }
+.badge-tipo-EMERG { background:#fd7e14; color:#fff; }
+.imp-prog-box { border:1px solid #d7e5dc; border-radius:8px; background:#fbfdfb; padding:14px; }
+.imp-prog-bar { height:12px; background:#e8eef4; border-radius:999px; overflow:hidden; }
+.imp-prog-bar span { display:block; height:100%; width:0%; background:#28a745; transition:width .2s ease; }
+.imp-prog-log { max-height:220px; overflow:auto; background:#111827; color:#dbeafe; border-radius:6px; padding:10px; font-family:Consolas,monospace; font-size:12px; white-space:pre-wrap; }
+.imp-prog-fields { display:flex; flex-wrap:wrap; gap:6px; }
+.imp-prog-fields span { border:1px solid #d7dee8; border-radius:999px; padding:4px 8px; font-size:12px; background:#fff; color:#334155; }
+.plan-resumen-card { border:1px solid #dce8df; border-radius:10px; box-shadow:0 8px 24px rgba(18,55,42,.06); }
+.plan-mini-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+.plan-timeline-wrap { max-height:320px; overflow:auto; border:1px solid #e6ece8; border-radius:8px; }
+.plan-timeline-table td, .plan-timeline-table th { vertical-align:middle; }
+.plan-selected-row { background:#eef8f0 !important; }
+.status-filter-card { cursor:pointer; transition:transform .16s ease,box-shadow .16s ease; border:2px solid transparent; }
+.status-filter-card:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(28,60,44,.14) !important; }
+.status-filter-card.active { border-color:#176b45; box-shadow:0 0 0 3px rgba(23,107,69,.12) !important; }
+.prog-filter-bar { background:#f4f8f5; border:1px solid #dce8df; border-radius:10px; padding:10px 12px; }
+.prog-note-card { border-radius:10px; padding:14px; height:100%; }
+.prog-note-plan { background:#eef5ff; border:1px solid #cfe0f5; }
+.prog-note-occ { background:#fff8e6; border:1px solid #f2d991; }
+.prog-note-title { font-weight:800; font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px; }
+</style>
+
+<section class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1><i class="fas fa-calendar-check mr-2 text-success"></i>Programacion de Mantenimiento</h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="../../home.php">Inicio</a></li>
+                    <li class="breadcrumb-item"><a href="index.php">OT</a></li>
+                    <li class="breadcrumb-item active">Programacion</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-6 col-md-3">
+                <div class="info-box shadow-sm status-filter-card" data-status-filter="">
+                    <span class="info-box-icon bg-secondary elevation-1"><i class="fas fa-calendar-alt"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Total</span>
+                        <span class="info-box-number" id="statTotal">-</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="info-box shadow-sm status-filter-card" data-status-filter="Pendiente">
+                    <span class="info-box-icon bg-warning elevation-1"><i class="fas fa-clock"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Pendientes</span>
+                        <span class="info-box-number" id="statPendiente">-</span>
+                        <small class="text-muted">Clic para listar</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="info-box shadow-sm status-filter-card" data-status-filter="Ejecutado">
+                    <span class="info-box-icon bg-success elevation-1"><i class="fas fa-check"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Ejecutados</span>
+                        <span class="info-box-number" id="statEjecutado">-</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="info-box shadow-sm status-filter-card" data-status-filter="Vencido">
+                    <span class="info-box-icon bg-danger elevation-1"><i class="fas fa-exclamation-triangle"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Vencidos</span>
+                        <span class="info-box-number" id="statVencido">-</span>
+                        <small class="text-muted">Clic para atender</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="info-box shadow-sm status-filter-card" data-status-filter="Ejecutado fuera de fecha">
+                    <span class="info-box-icon elevation-1" style="background:#fd7e14;color:#fff;"><i class="fas fa-history"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Fuera fecha</span>
+                        <span class="info-box-number" id="statEjecutadoTarde">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card plan-resumen-card mb-3">
+            <div class="card-header bg-white">
+                <h3 class="card-title mb-0"><i class="fas fa-layer-group mr-2 text-success"></i>Vista por Mantenimiento</h3>
+                <div class="card-tools d-flex align-items-center">
+                    <label for="filtroAnioProg" class="mb-0 mr-2 text-muted small font-weight-bold">
+                        <i class="fas fa-calendar-alt mr-1"></i>Año
+                    </label>
+                    <select id="filtroAnioProg" class="form-control form-control-sm" style="width:110px;" aria-label="Filtrar planes por año"></select>
+                </div>
+                <div class="text-muted small mt-1">Aqui ves cuantas lineas genero cada plan y cuales ya quedaron realizadas por OT.</div>
+            </div>
+            <div class="card-body">
+                <div id="spinnerPlanes" class="text-center py-3">
+                    <i class="fas fa-spinner fa-spin fa-2x text-secondary"></i>
+                    <p class="mt-2 text-muted mb-0">Armando vista por mantenimiento...</p>
+                </div>
+                <div id="wrapPlanesResumen" style="display:none;">
+                    <div class="table-responsive">
+                        <table id="tblPlanesResumen" class="table table-sm table-bordered table-hover mb-0 w-100">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Plan</th>
+                                    <th>Descripcion</th>
+                                    <th>Equipo</th>
+                                    <th class="text-center">Modalidad</th>
+                                    <th class="text-center">Frecuencia</th>
+                                    <th class="text-center">Lineas</th>
+                                    <th class="text-center">Pend.</th>
+                                    <th class="text-center">Ejec.</th>
+                                    <th class="text-center">Venc.</th>
+                                    <th class="text-center">Fuera fecha</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="planesResumenBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-outline card-success">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-list mr-2"></i>Ocurrencias de Programacion</h3>
+                <div class="card-tools">
+                    <a href="index.php" class="btn btn-sm btn-outline-secondary mr-1">
+                        <i class="fas fa-wrench"></i> Ordenes de Trabajo
+                    </a>
+                    <a href="correos_programacion.php" class="btn btn-sm btn-outline-info mr-1">
+                        <i class="fas fa-envelope"></i> Correos
+                    </a>
+                    <?php if (tiene_permiso('mantenimientos', 'crear')): ?>
+                    <a href="<?= htmlspecialchars(rtrim(BASE_URL, '/') . '/api/mantenimientos/import_prog.php?template=1', ENT_QUOTES) ?>" class="btn btn-sm btn-outline-success mr-1">
+                        <i class="fas fa-file-download"></i> Plantilla
+                    </a>
+                    <button type="button" class="btn btn-sm btn-outline-primary mr-1" id="btnOpenImportProg">
+                        <i class="fas fa-file-upload"></i> Subir Excel
+                    </button>
+                    <a href="nueva_prog.php" class="btn btn-sm btn-success">
+                        <i class="fas fa-plus"></i> Nueva Programacion
+                    </a>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="prog-filter-bar d-flex align-items-center justify-content-between flex-wrap mb-3">
+                    <div>
+                        <strong><i class="fas fa-filter mr-1 text-success"></i>Vista actual:</strong>
+                        <span id="estadoFilterLabel" class="badge badge-success badge-pill ml-1">Todas las ocurrencias</span>
+                        <small class="text-muted ml-2">Pulsa Pendientes o Vencidos arriba para verlas directamente.</small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2 mt-md-0" id="btnClearEstadoFilter" style="display:none;">
+                        <i class="fas fa-times mr-1"></i>Quitar filtro de estado
+                    </button>
+                </div>
+                <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+                    <div>
+                        <strong>Detalle del plan seleccionado:</strong>
+                        <span id="selectedPlanLabel" class="text-success font-weight-bold">Todos los planes</span>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearPlanFilter" style="display:none;">
+                        <i class="fas fa-times mr-1"></i>Ver todos
+                    </button>
+                </div>
+                <div id="spinnerProg" class="text-center py-4">
+                    <i class="fas fa-spinner fa-spin fa-2x text-secondary"></i>
+                    <p class="mt-2 text-muted">Cargando datos desde SAP...</p>
+                </div>
+                <div id="wrapTabla" style="display:none;">
+                    <table id="tblProg" class="table table-bordered table-striped table-hover table-sm w-100">
+                        <thead>
+                            <tr>
+                                <th style="width:110px;">Codigo</th>
+                                <th style="width:110px;">Plan</th>
+                                <th>Descripcion</th>
+                                <th>Equipo</th>
+                                <th class="text-center" style="width:110px;">Tipo</th>
+                                <th class="text-center" style="width:160px;">Modalidad</th>
+                                <th class="text-center" style="width:110px;">F. Programada</th>
+                                <th class="text-center" style="width:100px;">Periodo</th>
+                                <th class="text-center" style="width:110px;">Frecuencia</th>
+                                <th class="text-center" style="width:110px;">Estado</th>
+                                <th class="text-center" style="width:120px;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="modal fade" id="modalDetProg" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header" style="background:linear-gradient(135deg,#1b4332,#2d6a4f);">
+                <h5 class="modal-title text-white font-weight-bold">
+                    <i class="fas fa-calendar-check mr-2"></i><span id="dp_modal_title">Programación</span>
+                    <span id="dp_code" class="badge badge-light ml-2"></span>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-lg-5">
+                        <table class="table table-sm table-borderless mb-3">
+                            <tr><th width="130">Plan:</th><td id="dp_plan"></td></tr>
+                            <tr><th>Descripcion:</th><td id="dp_name"></td></tr>
+                            <tr><th>Equipo:</th><td id="dp_equipo"></td></tr>
+                            <tr><th>N Inventario:</th><td id="dp_inv"></td></tr>
+                            <tr><th>Tipo Mant.:</th><td id="dp_tipo"></td></tr>
+                            <tr><th>Modalidad:</th><td id="dp_modalidad"></td></tr>
+                        </table>
+                    </div>
+                    <div class="col-lg-7">
+                        <table class="table table-sm table-borderless mb-3">
+                            <tr><th width="150" id="dp_fecha_label">F. Programada:</th><td id="dp_fecha"></td></tr>
+                            <tr><th>Frecuencia:</th><td id="dp_frec"></td></tr>
+                            <tr class="dp-occurrence-only"><th>Estado:</th><td id="dp_estado"></td></tr>
+                            <tr class="dp-occurrence-only"><th>OT asociada:</th><td id="dp_ot"></td></tr>
+                            <tr class="dp-occurrence-only"><th>Creado:</th><td id="dp_created"></td></tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="prog-note-card prog-note-plan mb-3" id="dp_instruction_card">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap mb-2">
+                        <div>
+                            <div class="prog-note-title text-primary"><i class="fas fa-tools mr-1"></i><span id="dp_instruction_title">Trabajo programado para esta ocurrencia</span></div>
+                            <small class="text-muted" id="dp_instruction_subtitle">Esta es la instrucción que debe ejecutar el técnico en esta fecha.</small>
+                        </div>
+                        <span id="dp_instruction_source" class="badge badge-primary badge-pill mt-1"></span>
+                    </div>
+                    <div id="dp_effective_observ" class="font-weight-bold" style="white-space:pre-wrap;"></div>
+                    <div id="dp_instruction_help" class="small text-muted border-top mt-3 pt-2"></div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-3"><div class="small text-muted">Lineas del plan</div><div class="h4 mb-0" id="dp_total_lineas">0</div></div>
+                    <div class="col-md-3"><div class="small text-muted">Pendientes</div><div class="h4 mb-0 text-warning" id="dp_pendientes">0</div></div>
+                    <div class="col-md-3"><div class="small text-muted">Ejecutadas</div><div class="h4 mb-0 text-success" id="dp_ejecutadas">0</div></div>
+                    <div class="col-md-3"><div class="small text-muted">Vencidas</div><div class="h4 mb-0 text-danger" id="dp_vencidas">0</div></div>
+                </div>
+
+                <div class="mb-3 dp-occurrence-only">
+                    <label class="font-weight-bold">Acciones de la ocurrencia:</label>
+                    <div class="btn-group btn-group-sm">
+                        <?php if (tiene_permiso('mantenimientos', 'editar')): ?>
+                        <button type="button" class="btn btn-outline-danger" id="btnCancelarOcurrenciaDetalle">
+                            <i class="fas fa-ban mr-1"></i>Cancelar ocurrencia
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                    <input type="hidden" id="dp_code_hidden">
+                    <input type="hidden" id="dp_plan_code_hidden">
+                </div>
+
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="font-weight-bold mb-0">Detalle visual del mantenimiento</label>
+                        <small class="text-muted">Aqui ves todas las lineas del plan y si una OT la dejo realizada.</small>
+                    </div>
+                    <div class="plan-timeline-wrap">
+                        <table class="table table-sm table-bordered table-hover mb-0 plan-timeline-table">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Periodo</th>
+                                    <th>Fecha</th>
+                                    <th>Estado</th>
+                                    <th>OT</th>
+                                    <th class="text-center">Indicación</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dp_timeline_body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" id="btnGenerarOT" class="btn btn-primary dp-occurrence-only" data-code="">
+                    <i class="fas fa-plus-circle mr-1"></i>Generar OT
+                </button>
+                <?php if (tiene_permiso('mantenimientos', 'editar')): ?>
+                <button type="button" id="btnEditarOcurrenciaDetalle" class="btn btn-info dp-occurrence-only">
+                    <i class="fas fa-edit mr-1"></i>Editar esta ocurrencia
+                </button>
+                <?php endif; ?>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditarOcurrencia" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title font-weight-bold mb-0">
+                    <i class="fas fa-calendar-alt mr-2"></i>Editar ocurrencia
+                    <span id="editOccCodeLabel" class="badge badge-light ml-2"></span>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success py-2">
+                    <i class="fas fa-shield-alt mr-1"></i>Solo cambia esta ocurrencia. El equipo, frecuencia y plan no se modifican.
+                </div>
+                <input type="hidden" id="editOccCode">
+                <div class="row mb-3">
+                    <div class="col-md-6"><small class="text-muted d-block">Plan</small><strong id="editOccPlan"></strong></div>
+                    <div class="col-md-6"><small class="text-muted d-block">Equipo</small><strong id="editOccEquipo"></strong></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-5">
+                        <div class="form-group">
+                            <label for="editOccFecha" class="font-weight-bold">Fecha programada <small class="text-muted">(opcional cambiar)</small></label>
+                            <input type="date" id="editOccFecha" class="form-control" required>
+                            <small class="text-muted">Dejela sin cambios si solo editara la observacion.</small>
+                        </div>
+                    </div>
+                    <div class="col-md-7">
+                        <div class="form-group">
+                            <label class="font-weight-bold">Datos protegidos</label>
+                            <input type="text" id="editOccProtected" class="form-control" readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editOccObservacion" class="font-weight-bold">Observacion de esta ocurrencia</label>
+                    <textarea id="editOccObservacion" class="form-control" maxlength="254" rows="3"></textarea>
+                </div>
+                <div class="form-group mb-0" id="editOccMotivoGroup" style="display:none;">
+                    <label for="editOccMotivo" class="font-weight-bold">Motivo del cambio <span class="text-danger">*</span></label>
+                    <textarea id="editOccMotivo" class="form-control" maxlength="220" rows="2" placeholder="Explique por que se cambia la fecha"></textarea>
+                    <small class="text-muted">Se solicita solo al reprogramar y se guardara en @TAMA_REPROGHIST.</small>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-info font-weight-bold" id="btnGuardarOcurrenciaSegura">
+                    <i class="fas fa-save mr-1"></i>Guardar ocurrencia
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditarDatosPlan" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title font-weight-bold mb-0">
+                    <i class="fas fa-edit mr-2"></i>Editar datos del programa
+                    <span id="editPlanCodeLabel" class="badge badge-light ml-2"></span>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success py-2">
+                    <i class="fas fa-shield-alt mr-1"></i>
+                    Esta edicion no modifica equipos, frecuencia, fechas ni ocurrencias.
+                </div>
+                <input type="hidden" id="editPlanCode">
+                <div class="form-group">
+                    <label for="editPlanName" class="font-weight-bold">Descripcion</label>
+                    <input type="text" id="editPlanName" class="form-control" maxlength="100" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPlanModalidad" class="font-weight-bold">Modalidad</label>
+                    <select id="editPlanModalidad" class="form-control">
+                        <option value="">F.D. - Falta definir</option>
+                        <option value="MR">Mantenimiento rutinario</option>
+                        <option value="M">Mantenimiento</option>
+                    </select>
+                    <small class="text-muted">Se guarda como MR o M en U_Modalidad.</small>
+                </div>
+                <div class="form-group">
+                    <label for="editPlanObservacion" class="font-weight-bold">Observacion</label>
+                    <textarea id="editPlanObservacion" class="form-control" rows="7" maxlength="20000"></textarea>
+                    <small class="text-muted"><span id="editPlanObsCount">0</span>/20,000 caracteres</small>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="editPlanCritico" class="font-weight-bold">Criticidad</label>
+                            <select id="editPlanCritico" class="form-control">
+                                <option value="N">Normal</option>
+                                <option value="Y">Critico</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="editPlanActivo" class="font-weight-bold">Estado del programa</label>
+                            <select id="editPlanActivo" class="form-control">
+                                <option value="Y">Activo</option>
+                                <option value="N">Inactivo</option>
+                            </select>
+                            <small class="text-muted">Inactivar conserva todas las ocurrencias existentes.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-info font-weight-bold" id="btnGuardarDatosPlan">
+                    <i class="fas fa-save mr-1"></i>Guardar datos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalImportProg" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title font-weight-bold mb-0">
+                    <i class="fas fa-file-upload mr-2"></i>Carga masiva de programacion
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Cerrar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+                    <div>
+                        <strong>Plantilla Excel para @TAMA_PROGMANT</strong>
+                        <div class="text-muted small">Code puede quedar vacio para generar el siguiente PM-XXXX.</div>
+                    </div>
+                    <div class="d-flex flex-wrap">
+                        <a class="btn btn-outline-success btn-sm mr-2 mb-2" href="<?= htmlspecialchars(rtrim(BASE_URL, '/') . '/api/mantenimientos/import_prog.php?template=1', ENT_QUOTES) ?>">
+                            <i class="fas fa-download mr-1"></i>Descargar plantilla
+                        </a>
+                        <a class="btn btn-outline-info btn-sm mb-2" href="<?= htmlspecialchars(rtrim(BASE_URL, '/') . '/api/mantenimientos/import_prog.php?template_example=1', ENT_QUOTES) ?>">
+                            <i class="fas fa-file-excel mr-1"></i>Descargar ejemplo
+                        </a>
+                    </div>
+                </div>
+
+                <form id="formImportProg" enctype="multipart/form-data">
+                    <div class="alert alert-warning py-2 mb-3">
+                        <i class="fas fa-shield-alt mr-1"></i>
+                        <strong>Control de equipos:</strong> las filas cuyo equipo tenga estado <strong>DE BAJA</strong>
+                        se rechazaran y apareceran detalladas en el resultado de la importacion.
+                    </div>
+                    <div class="imp-prog-box">
+                        <div class="form-group">
+                            <label class="font-weight-bold">Archivo Excel</label>
+                            <input type="file" class="form-control" name="archivo" accept=".xlsx,.csv" required>
+                            <small class="text-muted">Acepta .xlsx o .csv. La primera fila debe tener cabeceras.</small>
+                        </div>
+                        <div class="d-flex flex-wrap align-items-center">
+                            <div class="form-check mr-4">
+                                <input class="form-check-input" type="checkbox" value="1" id="impActualizarProg" name="actualizar" checked>
+                                <label class="form-check-label" for="impActualizarProg">Actualizar si el Code ya existe</label>
+                            </div>
+                            <div class="form-check mr-4">
+                                <input class="form-check-input" type="checkbox" value="1" id="impSinCabeceraProg" name="sin_cabecera">
+                                <label class="form-check-label" for="impSinCabeceraProg">Mi archivo no tiene cabecera</label>
+                            </div>
+                            <button type="submit" class="btn btn-success ml-auto" id="btnPrepareImportProg">
+                                <i class="fas fa-play mr-1"></i>Preparar carga
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="mt-3">
+                    <div class="text-muted small mb-2">Columnas reconocidas:</div>
+                    <div class="imp-prog-fields">
+                        <?php foreach (['Code','Name *','U_ItemCode *','U_TipoMant *','U_FechaProg *','U_FechaInicioPlan','U_FechaFinPlan','U_Frecuencia *','U_GeneraAuto','U_AnioBase','U_TipoPeriodo','U_Activo','U_Estado','U_Observacion','U_Modalidad'] as $f): ?>
+                        <span><?= htmlspecialchars($f, ENT_QUOTES) ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="alert alert-info mt-3 mb-0 py-2 small">
+                        Sin cabecera: A=Code, B=Name, C=U_ItemCode, D=U_TipoMant, E=U_FechaProg,
+                        F=U_FechaInicioPlan, G=U_FechaFinPlan, H=U_Frecuencia, I=U_GeneraAuto, J=U_AnioBase,
+                        K=U_TipoPeriodo, L=U_Activo, M=U_Estado, N=U_Observacion, O=U_Modalidad (MR o M).
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-light py-2">
+                            <strong>Ejemplo de archivo diligenciado</strong>
+                            <div class="text-muted small">Usa este modelo como guia antes de subir tu carga masiva.</div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-0">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Name</th>
+                                            <th>U_ItemCode</th>
+                                            <th>U_TipoMant</th>
+                                            <th>U_FechaProg</th>
+                                            <th>U_FechaInicioPlan</th>
+                                            <th>U_FechaFinPlan</th>
+                                            <th>U_Frecuencia</th>
+                                            <th>U_GeneraAuto</th>
+                                            <th>U_AnioBase</th>
+                                            <th>U_TipoPeriodo</th>
+                                            <th>U_Activo</th>
+                                            <th>U_Estado</th>
+                                            <th>U_Observacion</th>
+                                            <th>U_Modalidad</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td></td>
+                                            <td>Mantenimiento Preventivo Compresor Principal</td>
+                                            <td>EQ-COMP-001</td>
+                                            <td>PREV</td>
+                                            <td>2026-08-15</td>
+                                            <td>2026-08-15</td>
+                                            <td></td>
+                                            <td>Mensual</td>
+                                            <td>Y</td>
+                                            <td>2026</td>
+                                            <td>MENSUAL</td>
+                                            <td>Y</td>
+                                            <td>Pendiente</td>
+                                            <td>Lubricacion general y revision de filtros.</td>
+                                            <td>MR</td>
+                                        </tr>
+                                        <tr>
+                                            <td>PM-0105</td>
+                                            <td>Mantenimiento Preventivo Planta Electrica</td>
+                                            <td>EQ-PLANTA-002</td>
+                                            <td>PREV</td>
+                                            <td>2026-01-10</td>
+                                            <td>2026-01-10</td>
+                                            <td>2026-12-31</td>
+                                            <td>Mensual</td>
+                                            <td>Y</td>
+                                            <td>2026</td>
+                                            <td>MENSUAL</td>
+                                            <td>Y</td>
+                                            <td>Pendiente</td>
+                                            <td>Si el Code ya existe y marcas actualizar, el registro se modifica.</td>
+                                            <td>M</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white py-2 small text-muted">
+                            Formato recomendado: <strong>AAAA-MM-DD</strong> en fechas, <strong>Y/N</strong> para activo y genera auto, y valores como <strong>MENSUAL</strong>, <strong>SEMANAL</strong> o <strong>TRIMESTRAL</strong> en tipo periodo.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="imp-prog-box mt-3" id="boxImportProgProgress" style="display:none;">
+                    <div class="d-flex justify-content-between">
+                        <strong id="importProgStatus">Listo</strong>
+                        <span id="importProgCounter" class="text-muted small"></span>
+                    </div>
+                    <div class="imp-prog-bar my-2"><span id="importProgBar"></span></div>
+                    <div class="mb-2">
+                        <button type="button" class="btn btn-primary btn-sm" id="btnStartImportProg" disabled>
+                            <i class="fas fa-database mr-1"></i>Iniciar importacion
+                        </button>
+                    </div>
+                    <div class="imp-prog-log" id="importProgLog"></div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php
+$puedeEditar = tiene_permiso('mantenimientos', 'editar') ? 'true' : 'false';
+$baseUrl = BASE_URL;
+$importProgUrl = rtrim(BASE_URL, '/') . '/api/mantenimientos/import_prog.php';
+$currentYear = date('Y');
+
+$inlineJs = <<<JS
+var puedeEditar = {$puedeEditar};
+var allRows = [];
+var dtProg = null;
+var dtPlanesResumen = null;
+var selectedPlanCode = '';
+var selectedEstado = '';
+var selectedYear = '{$currentYear}';
+var importProgUrl = '{$importProgUrl}';
+var importProgToken = '';
+var importProgStart = 2;
+var importProgChunk = 500;
+var importProgTotals = {inserted:0, updated:0, skipped:0, errors:0};
+
+function esc(s) {
+    return s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function attr(s) {
+    return esc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function dateOnly(s) {
+    if (!s) return '';
+    var m = String(s).match(/^\\d{4}-\\d{2}-\\d{2}/);
+    return m ? m[0] : String(s).split('T')[0].split(' ')[0];
+}
+function fmt(s) { return s ? dateOnly(s) : '-'; }
+function rawDate(s) { return dateOnly(s); }
+function rowYear(row) {
+    var candidates = [row && row.U_AnioBase, row && row.U_Anio];
+    for (var i = 0; i < candidates.length; i++) {
+        var value = String(candidates[i] || '').trim();
+        if (/^\d{4}$/.test(value)) return value;
+    }
+    var date = rawDate(row && row.U_FechaProg);
+    return /^\d{4}-/.test(date) ? date.substring(0, 4) : '';
+}
+function rowsForSelectedYear() {
+    return allRows.filter(function(row) { return rowYear(row) === selectedYear; });
+}
+function populateYearFilter() {
+    var years = {};
+    years[selectedYear] = true;
+    allRows.forEach(function(row) {
+        var year = rowYear(row);
+        if (year) years[year] = true;
+    });
+    var options = Object.keys(years).sort(function(a, b) { return Number(b) - Number(a); });
+    var select = document.getElementById('filtroAnioProg');
+    select.innerHTML = options.map(function(year) {
+        return '<option value="' + attr(year) + '">' + esc(year) + '</option>';
+    }).join('');
+    select.value = selectedYear;
+}
+function badgeTipo(code) {
+    var labels = {PREV:'Preventivo',CORR:'Correctivo',PRED:'Predictivo',EMERG:'Emergencia'};
+    return '<span class="badge badge-tipo-' + (code||'') + ' badge-pill px-2">' + esc(labels[code] || code || '-') + '</span>';
+}
+function modalidadLabel(code) {
+    var value = String(code || '').toUpperCase();
+    return value === 'M' || value === 'MR' ? value : 'F.D.';
+}
+function badgeModalidad(code) {
+    var value = modalidadLabel(code);
+    var css = value === 'M' ? 'badge-info' : value === 'MR' ? 'badge-success' : 'badge-warning text-dark';
+    return '<span class="badge ' + css + ' badge-pill">' + esc(value) + '</span>';
+}
+function badgeEstado(s) {
+    var labels = {
+        Pendiente:'Pendiente',
+        Ejecutado:'Ejecutado',
+        Vencido:'Vencido',
+        'Ejecutado fuera de fecha':'Ejecutado fuera de fecha'
+    };
+    var cls = s ? 'badge-estado-' + String(s).replace(/\\s+/g, '-') : 'badge-secondary';
+    return '<span class="badge ' + cls + ' badge-pill">' + esc(labels[s] || s || '-') + '</span>';
+}
+function periodLabel(r) {
+    if (r.U_TipoPeriodo === 'SEMANAL') return 'Sem ' + (r.U_Semana || r.U_PeriodoNum || '-');
+    if (r.U_TipoPeriodo === 'QUINCENAL') return 'Qna ' + (r.U_PeriodoNum || '-');
+    if (r.U_TipoPeriodo === 'MENSUAL') return 'Mes ' + (r.U_Mes || r.U_PeriodoNum || '-');
+    if (r.U_TipoPeriodo === 'BIMENSUAL') return 'Bim ' + (r.U_PeriodoNum || '-');
+    if (r.U_TipoPeriodo === 'TRIMESTRAL') return 'Trim ' + (r.U_PeriodoNum || '-');
+    if (r.U_TipoPeriodo === 'SEMESTRAL') return 'Sem ' + (r.U_PeriodoNum || '-');
+    if (r.U_TipoPeriodo === 'ANUAL') return 'Anual';
+    return r.U_PeriodoNum ? 'Periodo ' + r.U_PeriodoNum : '-';
+}
+function otLabel(r) {
+    if (r.U_OTDocNum) return 'OT-' + r.U_OTDocNum;
+    if (r.U_OTDocEntry) return 'DocEntry ' + r.U_OTDocEntry;
+    return '-';
+}
+function occurrenceEditable(row) {
+    return !!row && row.IsOccurrence !== 'N' && !row.U_OTDocEntry && !row.U_OTDocNum
+        && (row.U_Estado === 'Pendiente' || row.U_Estado === 'Vencido');
+}
+function occurrenceObservation(row) {
+    if (!row) return '';
+    return row.OccurrenceObservation != null ? String(row.OccurrenceObservation) : '';
+}
+function planObservation(row) {
+    return row ? String(row.PlanObservation || '').trim() : '';
+}
+function isCustomOccurrenceObservation(row) {
+    var occurrence = occurrenceObservation(row).trim();
+    return occurrence !== '' && occurrence !== planObservation(row);
+}
+function effectiveObservation(row) {
+    return isCustomOccurrenceObservation(row)
+        ? occurrenceObservation(row).trim()
+        : planObservation(row);
+}
+function buildPlanGroups(rows) {
+    var groups = {};
+    rows.forEach(function(r) {
+        var key = r.PlanCode || r.Code;
+        if (!groups[key]) {
+            groups[key] = {
+                planCode: key,
+                name: r.Name || '',
+                itemCode: r.U_ItemCode || '',
+                itemName: r.ItemName || '',
+                frecuencia: r.U_Frecuencia || '',
+                tipo: r.U_TipoMant || '',
+                rows: [],
+                total: 0,
+                pendiente: 0,
+                ejecutado: 0,
+                vencido: 0,
+                fuera: 0
+            };
+        }
+        groups[key].rows.push(r);
+        groups[key].total++;
+        if (r.U_Estado === 'Pendiente') groups[key].pendiente++;
+        if (r.U_Estado === 'Ejecutado') groups[key].ejecutado++;
+        if (r.U_Estado === 'Vencido') groups[key].vencido++;
+        if (r.U_Estado === 'Ejecutado fuera de fecha') groups[key].fuera++;
+    });
+    Object.keys(groups).forEach(function(k) {
+        groups[k].rows.sort(function(a,b) {
+            return String(a.U_FechaProg || '').localeCompare(String(b.U_FechaProg || ''));
+        });
+    });
+    return groups;
+}
+function calcStats(rows) {
+    var total = rows.length, pend = 0, ejec = 0, venc = 0, ejecTarde = 0;
+    rows.forEach(function(r) {
+        if (r.U_Estado === 'Pendiente') pend++;
+        if (r.U_Estado === 'Ejecutado') ejec++;
+        if (r.U_Estado === 'Vencido') venc++;
+        if (r.U_Estado === 'Ejecutado fuera de fecha') ejecTarde++;
+    });
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statPendiente').textContent = pend;
+    document.getElementById('statEjecutado').textContent = ejec;
+    document.getElementById('statVencido').textContent = venc;
+    document.getElementById('statEjecutadoTarde').textContent = ejecTarde;
+}
+function renderPlanesResumen(rows) {
+    var body = document.getElementById('planesResumenBody');
+    var tableState = {
+        search: '',
+        page: 0,
+        length: 10,
+        order: [[0, 'asc']]
+    };
+    if (dtPlanesResumen) {
+        tableState.search = dtPlanesResumen.search();
+        tableState.page = dtPlanesResumen.page();
+        tableState.length = dtPlanesResumen.page.len();
+        tableState.order = dtPlanesResumen.order();
+        dtPlanesResumen.destroy();
+        dtPlanesResumen = null;
+    }
+    var groups = buildPlanGroups(rows);
+    var plans = Object.keys(groups).map(function(k){ return groups[k]; });
+    plans.sort(function(a,b){ return a.planCode.localeCompare(b.planCode); });
+    body.innerHTML = plans.map(function(g) {
+        return '<tr>'
+            + '<td class="font-weight-bold text-monospace">' + esc(g.planCode) + '</td>'
+            + '<td>' + esc(g.name) + '</td>'
+            + '<td><span class="font-weight-bold">' + esc(g.itemCode) + '</span><br><small class="text-muted">' + esc(g.itemName) + '</small></td>'
+            + '<td class="text-center">' + badgeModalidad(g.rows[0].U_Modalidad) + '</td>'
+            + '<td class="text-center">' + esc(g.frecuencia || '-') + '</td>'
+            + '<td class="text-center"><span class="plan-mini-badge bg-secondary text-white">' + g.total + '</span></td>'
+            + '<td class="text-center"><span class="plan-mini-badge bg-warning text-dark">' + g.pendiente + '</span></td>'
+            + '<td class="text-center"><span class="plan-mini-badge bg-success text-white">' + g.ejecutado + '</span></td>'
+            + '<td class="text-center"><span class="plan-mini-badge bg-danger text-white">' + g.vencido + '</span></td>'
+            + '<td class="text-center"><span class="plan-mini-badge" style="background:#fd7e14;color:#fff;">' + g.fuera + '</span></td>'
+            + '<td class="text-center">'
+            + '<div class="btn-group btn-group-sm">'
+            + '<button type="button" class="btn btn-outline-primary btn-ver-plan" data-plan="' + attr(g.planCode) + '" title="Ver datos generales y calendario del plan"><i class="fas fa-eye"></i></button>'
+            + (puedeEditar ? '<button type="button" class="btn btn-outline-info btn-edit-plan-safe" data-plan="' + attr(g.planCode) + '" title="Editar datos sin modificar ocurrencias"><i class="fas fa-edit"></i></button>' : '')
+            + (puedeEditar ? '<button type="button" class="btn btn-outline-danger btn-delete-plan" data-plan="' + attr(g.planCode) + '" data-name="' + attr(g.name) + '" data-total="' + g.total + '" title="Eliminar programación"><i class="fas fa-trash"></i></button>' : '')
+            + '</div>'
+            + '</td>'
+            + '</tr>';
+    }).join('');
+    document.getElementById('spinnerPlanes').style.display = 'none';
+    document.getElementById('wrapPlanesResumen').style.display = '';
+    dtPlanesResumen = $('#tblPlanesResumen').DataTable({
+        language: DATATABLES_SPANISH,
+        responsive: true,
+        pageLength: tableState.length,
+        order: tableState.order
+    });
+    if (tableState.search) {
+        dtPlanesResumen.search(tableState.search).draw();
+    }
+    var pageInfo = dtPlanesResumen.page.info();
+    if (pageInfo.pages > 0) {
+        dtPlanesResumen.page(Math.min(tableState.page, pageInfo.pages - 1)).draw(false);
+    }
+    paintSelectedPlan();
+}
+function rowsByPlan(planCode) {
+    var yearRows = rowsForSelectedYear();
+    if (!planCode) return yearRows;
+    return yearRows.filter(function(r) { return (r.PlanCode || r.Code) === planCode; });
+}
+function rowsForCurrentView() {
+    return rowsByPlan(selectedPlanCode).filter(function(row) {
+        return !selectedEstado || row.U_Estado === selectedEstado;
+    });
+}
+function updateEstadoFilterUi() {
+    var label = document.getElementById('estadoFilterLabel');
+    var clear = document.getElementById('btnClearEstadoFilter');
+    label.textContent = selectedEstado || 'Todas las ocurrencias';
+    label.className = 'badge badge-pill ml-1 ' + (selectedEstado === 'Vencido' ? 'badge-danger' : selectedEstado === 'Pendiente' ? 'badge-warning' : 'badge-success');
+    clear.style.display = selectedEstado ? '' : 'none';
+    $('.status-filter-card').removeClass('active');
+    $('.status-filter-card[data-status-filter="' + selectedEstado.replace(/"/g, '\\"') + '"]').addClass('active');
+}
+function selectedPlanName(planCode) {
+    var rows = rowsByPlan(planCode);
+    if (!rows.length) return planCode || 'Todos los planes';
+    return planCode + ' - ' + (rows[0].Name || '');
+}
+function paintSelectedPlan() {
+    $('#planesResumenBody tr').removeClass('plan-selected-row');
+    if (!selectedPlanCode) return;
+    $('#planesResumenBody .btn-ver-plan[data-plan="' + selectedPlanCode.replace(/"/g, '\\"') + '"]').closest('tr').addClass('plan-selected-row');
+}
+function updateSelectedPlanUi() {
+    document.getElementById('selectedPlanLabel').textContent = selectedPlanCode ? selectedPlanName(selectedPlanCode) : 'Todos los planes';
+    document.getElementById('btnClearPlanFilter').style.display = selectedPlanCode ? '' : 'none';
+    paintSelectedPlan();
+}
+function renderProgTable(rows) {
+    document.getElementById('spinnerProg').style.display = 'none';
+    document.getElementById('wrapTabla').style.display = '';
+    if (dtProg) { dtProg.destroy(); }
+    dtProg = $('#tblProg').DataTable({
+        language: DATATABLES_SPANISH,
+        responsive: true,
+        data: rows,
+        columns: [
+            { data: 'Code', className: 'font-weight-bold text-monospace' },
+            { data: 'PlanCode', className: 'text-monospace' },
+            { data: 'Name', render: function(d){ return esc(d); } },
+            { data: null, render: function(r){
+                return '<span class="font-weight-bold">' + esc(r.U_ItemCode || '') + '</span><br><small class="text-muted">' + esc(r.ItemName || '') + '</small>';
+            }},
+            { data: 'U_TipoMant', className: 'text-center', render: function(d){ return badgeTipo(d); } },
+            { data: 'U_Modalidad', className: 'text-center', render: function(d){ return badgeModalidad(d); } },
+            { data: 'U_FechaProg', className: 'text-center', render: function(d){ return fmt(d); } },
+            { data: null, className: 'text-center', render: function(r){ return esc(periodLabel(r)); } },
+            { data: 'U_Frecuencia', className: 'text-center' },
+            { data: 'U_Estado', className: 'text-center', render: function(d){ return badgeEstado(d); } },
+            { data: null, orderable:false, className:'text-center', render: function(r){
+                return '<div class="btn-group btn-group-sm">'
+                    + '<button class="btn btn-primary btn-ver-prog" data-code="' + attr(r.Code) + '" data-plan="' + attr(r.PlanCode || '') + '" title="Ver detalle"><i class="fas fa-eye"></i></button>'
+                    + (puedeEditar && occurrenceEditable(r)
+                        ? '<button class="btn btn-info btn-edit-occurrence" data-code="' + attr(r.Code) + '" title="Editar fecha u observacion"><i class="fas fa-edit"></i></button>'
+                        : '')
+                    + '</div>';
+            }}
+        ],
+        order: [[5, 'asc']],
+        dom: 'Bfrtip',
+        buttons: [
+            {
+                extend:'excelHtml5',
+                text:'<i class="fas fa-file-excel mr-1"></i>Excel',
+                className:'btn btn-sm btn-success',
+                title:'programacion_mantenimiento_sap',
+                exportOptions:{ modifier:{ page:'all', search:'none' } },
+                customizeData:function(xlsxData) {
+                    xlsxData.header = progExcelHeaders;
+                    xlsxData.body = progExcelRows();
+                }
+            },
+            {
+                extend:'print',
+                text:'<i class="fas fa-print mr-1"></i>Imprimir',
+                className:'btn btn-sm btn-secondary',
+                exportOptions:{ columns:[0,1,2,3,4,5,6,7,8], modifier:{ page:'all' } }
+            }
+        ],
+        pageLength: 20
+    });
+    updateSelectedPlanUi();
+}
+function selectPlan(planCode) {
+    selectedPlanCode = planCode || '';
+    renderProgTable(rowsForCurrentView());
+    updateEstadoFilterUi();
+}
+function selectEstado(estado) {
+    selectedEstado = estado || '';
+    renderProgTable(rowsForCurrentView());
+    updateEstadoFilterUi();
+    document.getElementById('tblProg').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function applyYearFilter() {
+    var yearRows = rowsForSelectedYear();
+    if (selectedPlanCode && !yearRows.some(function(row) { return (row.PlanCode || row.Code) === selectedPlanCode; })) {
+        selectedPlanCode = '';
+    }
+    calcStats(yearRows);
+    renderPlanesResumen(yearRows);
+    renderProgTable(rowsForCurrentView());
+    updateEstadoFilterUi();
+}
+function openPlanDetail(planCode) {
+    var rows = rowsByPlan(planCode).slice().sort(function(a, b) {
+        return String(a.U_FechaProg || '').localeCompare(String(b.U_FechaProg || ''));
+    });
+    if (!rows.length) {
+        Swal.fire('Sin ocurrencias', 'El programa seleccionado no tiene ocurrencias para mostrar.', 'info');
+        return;
+    }
+    var reference = rows[0];
+    selectPlan(planCode);
+    $('.dp-occurrence-only').hide();
+    document.getElementById('dp_modal_title').textContent = 'Plan de mantenimiento';
+    document.getElementById('dp_code').textContent = planCode;
+    document.getElementById('dp_code_hidden').value = '';
+    document.getElementById('dp_plan_code_hidden').value = planCode;
+    document.getElementById('dp_plan').textContent = planCode;
+    document.getElementById('dp_name').textContent = reference.Name || '-';
+    document.getElementById('dp_equipo').textContent = (reference.U_ItemCode || '') + ' - ' + (reference.ItemName || '');
+    document.getElementById('dp_inv').textContent = reference.InventryNo || '-';
+    document.getElementById('dp_tipo').innerHTML = badgeTipo(reference.U_TipoMant);
+    document.getElementById('dp_modalidad').innerHTML = badgeModalidad(reference.U_Modalidad);
+    document.getElementById('dp_fecha_label').textContent = 'Rango del plan:';
+    document.getElementById('dp_fecha').textContent = fmt(rows[0].U_FechaProg) + (rows.length > 1 ? ' al ' + fmt(rows[rows.length - 1].U_FechaProg) : '');
+    document.getElementById('dp_frec').textContent = reference.U_Frecuencia || '-';
+
+    var card = document.getElementById('dp_instruction_card');
+    card.className = 'prog-note-card prog-note-plan mb-3';
+    document.getElementById('dp_instruction_title').textContent = 'Trabajo general del plan';
+    document.getElementById('dp_instruction_subtitle').textContent = 'Esta instrucción se aplica por defecto a todas las ocurrencias del plan.';
+    var source = document.getElementById('dp_instruction_source');
+    source.textContent = 'Observación del plan';
+    source.className = 'badge badge-primary badge-pill mt-1';
+    document.getElementById('dp_effective_observ').textContent = planObservation(reference) || 'El plan no tiene una instrucción general registrada.';
+    var personalizadas = rows.filter(isCustomOccurrenceObservation).length;
+    document.getElementById('dp_instruction_help').textContent = personalizadas
+        ? personalizadas + ' ocurrencia(s) tienen una indicación diferente. Están marcadas como Personalizada en el calendario.'
+        : 'Todas las ocurrencias conservan esta misma instrucción.';
+    renderTimeline(planCode, '');
+    $('#modalDetProg').modal('show');
+}
+function renderTimeline(planCode, currentCode) {
+    var body = document.getElementById('dp_timeline_body');
+    var groups = buildPlanGroups(rowsForSelectedYear());
+    var group = groups[planCode];
+    if (!group) {
+        body.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No hay lineas para este plan.</td></tr>';
+        return;
+    }
+    document.getElementById('dp_total_lineas').textContent = group.total;
+    document.getElementById('dp_pendientes').textContent = group.pendiente;
+    document.getElementById('dp_ejecutadas').textContent = group.ejecutado + group.fuera;
+    document.getElementById('dp_vencidas').textContent = group.vencido;
+    body.innerHTML = group.rows.map(function(r) {
+        var current = r.Code === currentCode ? ' style="background:#f5fbf7;"' : '';
+        return '<tr' + current + '>'
+            + '<td>' + esc(periodLabel(r)) + '</td>'
+            + '<td>' + esc(fmt(r.U_FechaProg)) + '</td>'
+            + '<td>' + badgeEstado(r.U_Estado) + '</td>'
+            + '<td>' + esc(otLabel(r)) + '</td>'
+            + '<td class="text-center">' + (isCustomOccurrenceObservation(r)
+                ? '<button type="button" class="btn btn-xs btn-warning btn-ver-indicacion" data-code="' + attr(r.Code || '') + '" title="Ver indicación personalizada"><i class="fas fa-sticky-note mr-1"></i>Personalizada</button>'
+                : '<span class="badge badge-light border text-muted" title="Usa la instrucción del plan"><i class="fas fa-link mr-1"></i>Del plan</span>') + '</td>'
+            + '</tr>';
+    }).join('');
+}
+
+var progExcelHeaders = [
+    'Code','PlanCode','Name','U_ItemCode','ItemName','InventryNo','AssetSerNo','Marca','Modelo','Ubicacion',
+    'U_TipoMant','TipoMantName','U_Modalidad','Modalidad','U_FechaProg','Periodo','U_Frecuencia','U_Estado','OT','OccurrenceObservation','PlanObservation','CreateDate'
+];
+function progExcelRows() {
+    return rowsByPlan(selectedPlanCode).map(function(r) {
+        return [
+            r.Code || '',
+            r.PlanCode || '',
+            r.Name || '',
+            r.U_ItemCode || '',
+            r.ItemName || '',
+            r.InventryNo || '',
+            r.AssetSerNo || '',
+            r.Marca || '',
+            r.Modelo || '',
+            r.Ubicacion || '',
+            r.U_TipoMant || '',
+            r.TipoMantName || '',
+            modalidadLabel(r.U_Modalidad),
+            modalidadLabel(r.U_Modalidad),
+            rawDate(r.U_FechaProg),
+            periodLabel(r),
+            r.U_Frecuencia || '',
+            r.U_Estado || '',
+            otLabel(r),
+            occurrenceObservation(r),
+            r.PlanObservation || '',
+            rawDate(r.CreateDate)
+        ];
+    });
+}
+function cargarProg() {
+    fetch('$baseUrl/api/mantenimientos/get_prog.php?_=' + Date.now(), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+    })
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            if (data.error) { console.error(data.error); return; }
+            allRows = Array.isArray(data) ? data : [];
+            populateYearFilter();
+            applyYearFilter();
+        })
+        .catch(function(e){ console.error(e); });
+}
+
+function removePlanFromUi(planCode) {
+    selectedPlanCode = '';
+    allRows = allRows.filter(function(row) {
+        return String(row.PlanCode || row.Code || '') !== String(planCode || '');
+    });
+    populateYearFilter();
+    applyYearFilter();
+}
+function openProgDetailByCode(code, fallbackPlan) {
+    var row = allRows.find(function(r){ return r.Code === code; });
+    if (!row) return;
+    var planCode = row.PlanCode || fallbackPlan || row.Code;
+    $('.dp-occurrence-only').show();
+    document.getElementById('dp_modal_title').textContent = 'Detalle de ocurrencia';
+    document.getElementById('dp_code').textContent = row.Code || '-';
+    document.getElementById('dp_code_hidden').value = row.Code || '';
+    document.getElementById('dp_plan_code_hidden').value = planCode;
+    document.getElementById('dp_plan').textContent = planCode;
+    document.getElementById('dp_name').textContent = row.Name || '-';
+    document.getElementById('dp_equipo').textContent = (row.U_ItemCode || '') + ' - ' + (row.ItemName || '');
+    document.getElementById('dp_inv').textContent = row.InventryNo || '-';
+    document.getElementById('dp_tipo').innerHTML = badgeTipo(row.U_TipoMant);
+    document.getElementById('dp_modalidad').innerHTML = badgeModalidad(row.U_Modalidad);
+    document.getElementById('dp_fecha_label').textContent = 'F. Programada:';
+    document.getElementById('dp_fecha').textContent = fmt(row.U_FechaProg);
+    document.getElementById('dp_frec').textContent = row.U_Frecuencia || '-';
+    document.getElementById('dp_estado').innerHTML = badgeEstado(row.U_Estado);
+    document.getElementById('dp_ot').textContent = otLabel(row);
+    document.getElementById('dp_created').textContent = fmt(row.CreateDate);
+    var personalizada = isCustomOccurrenceObservation(row);
+    var instruccion = effectiveObservation(row);
+    var source = document.getElementById('dp_instruction_source');
+    var card = document.getElementById('dp_instruction_card');
+    document.getElementById('dp_instruction_title').textContent = 'Trabajo programado para esta ocurrencia';
+    document.getElementById('dp_instruction_subtitle').textContent = 'Esta es la instrucción que debe ejecutar el técnico en esta fecha.';
+    source.textContent = personalizada ? 'Personalizada para esta ocurrencia' : 'Heredada del plan';
+    source.className = 'badge badge-pill mt-1 ' + (personalizada ? 'badge-warning' : 'badge-primary');
+    card.className = 'prog-note-card mb-3 ' + (personalizada ? 'prog-note-occ' : 'prog-note-plan');
+    document.getElementById('dp_effective_observ').textContent = instruccion || 'No hay una instrucción de trabajo registrada.';
+    document.getElementById('dp_instruction_help').textContent = personalizada
+        ? 'Esta indicación es exclusiva de ' + (row.Code || 'esta ocurrencia') + ' y no modifica las demás fechas del plan.'
+        : 'Esta ocurrencia utiliza la instrucción general del plan. Si la editas, solo esta fecha quedará personalizada.';
+    var btnGenerarOT = document.getElementById('btnGenerarOT');
+    btnGenerarOT.setAttribute('data-code', row.Code || '');
+    btnGenerarOT.style.display = occurrenceEditable(row) ? '' : 'none';
+    var btnEditOccurrence = document.getElementById('btnEditarOcurrenciaDetalle');
+    var btnCancelOccurrence = document.getElementById('btnCancelarOcurrenciaDetalle');
+    if (btnEditOccurrence) {
+        btnEditOccurrence.style.display = occurrenceEditable(row) ? '' : 'none';
+        btnEditOccurrence.setAttribute('data-code', row.Code || '');
+    }
+    if (btnCancelOccurrence) {
+        btnCancelOccurrence.style.display = occurrenceEditable(row) ? '' : 'none';
+        btnCancelOccurrence.setAttribute('data-code', row.Code || '');
+    }
+    renderTimeline(planCode, row.Code);
+    $('#modalDetProg').modal('show');
+}
+
+function openSafePlanEdit(planCode) {
+    if (!planCode) return;
+    fetch('$baseUrl/api/mantenimientos/get_prog.php?plan_code=' + encodeURIComponent(planCode), {
+        credentials: 'same-origin'
+    })
+    .then(function(response) {
+        return response.json().then(function(json) {
+            if (!response.ok || json.error) throw new Error(json.error || 'No se pudo cargar el programa.');
+            return json;
+        });
+    })
+    .then(function(rows) {
+        var plan = Array.isArray(rows) ? rows[0] : null;
+        if (!plan) throw new Error('No se encontro el programa seleccionado.');
+        document.getElementById('editPlanCode').value = plan.Code || planCode;
+        document.getElementById('editPlanCodeLabel').textContent = plan.Code || planCode;
+        document.getElementById('editPlanName').value = plan.Name || '';
+        document.getElementById('editPlanModalidad').value = plan.U_Modalidad === 'M' || plan.U_Modalidad === 'MR' ? plan.U_Modalidad : '';
+        document.getElementById('editPlanObservacion').value = plan.U_Observacion || '';
+        document.getElementById('editPlanObsCount').textContent = String(plan.U_Observacion || '').length;
+        document.getElementById('editPlanCritico').value = plan.U_Critico === 'Y' ? 'Y' : 'N';
+        document.getElementById('editPlanActivo').value = plan.U_Activo === 'N' ? 'N' : 'Y';
+        $('#modalDetProg').modal('hide');
+        setTimeout(function() { $('#modalEditarDatosPlan').modal('show'); }, 180);
+    })
+    .catch(function(error) {
+        Swal.fire('No se pudo abrir', error.message, 'error');
+    });
+}
+
+function saveSafePlanEdit() {
+    var code = document.getElementById('editPlanCode').value;
+    var name = document.getElementById('editPlanName').value.trim();
+    var observacion = document.getElementById('editPlanObservacion').value.trim();
+    var modalidad = document.getElementById('editPlanModalidad').value;
+    var critico = document.getElementById('editPlanCritico').value;
+    var activo = document.getElementById('editPlanActivo').value;
+    if (!code || !name) {
+        Swal.fire('Dato requerido', 'Ingrese la descripcion del programa.', 'warning');
+        return;
+    }
+    var button = document.getElementById('btnGuardarDatosPlan');
+    var oldHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Guardando';
+    fetch('$baseUrl/api/mantenimientos/guardar_prog.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+            action: 'update_metadata',
+            code: code,
+            name: name,
+            observacion: observacion,
+            modalidad: modalidad,
+            critico: critico,
+            activo: activo
+        })
+    })
+    .then(function(response) {
+        return response.json().then(function(json) {
+            if (!response.ok || !json.success) throw new Error(json.error || 'No se pudieron guardar los datos.');
+            return json;
+        });
+    })
+    .then(function(json) {
+        button.disabled = false;
+        button.innerHTML = oldHtml;
+        $('#modalEditarDatosPlan').modal('hide');
+        cargarProg();
+        Swal.fire({
+            icon: 'success',
+            title: 'Datos actualizados',
+            text: 'No se modifico ninguna ocurrencia.',
+            timer: 1900,
+            showConfirmButton: false
+        });
+    })
+    .catch(function(error) {
+        button.disabled = false;
+        button.innerHTML = oldHtml;
+        Swal.fire('No se pudo guardar', error.message, 'error');
+    });
+}
+
+function rowByOccurrenceCode(code) {
+    return allRows.find(function(row) { return String(row.Code || '') === String(code || ''); });
+}
+
+function openSafeOccurrenceEdit(code) {
+    var row = rowByOccurrenceCode(code);
+    if (!occurrenceEditable(row)) {
+        Swal.fire('Ocurrencia bloqueada', 'Solo se pueden editar ocurrencias pendientes o vencidas sin OT.', 'warning');
+        return;
+    }
+    document.getElementById('editOccCode').value = row.Code || '';
+    document.getElementById('editOccCodeLabel').textContent = row.Code || '';
+    document.getElementById('editOccPlan').textContent = (row.PlanCode || '') + ' - ' + (row.Name || '');
+    document.getElementById('editOccEquipo').textContent = (row.U_ItemCode || '') + ' - ' + (row.ItemName || '');
+    document.getElementById('editOccFecha').value = rawDate(row.U_FechaProg);
+    document.getElementById('editOccFecha').setAttribute('data-original-date', rawDate(row.U_FechaProg));
+    document.getElementById('editOccProtected').value = (row.TipoMantName || row.U_TipoMant || '-') + ' / ' + (row.U_Frecuencia || '-');
+    document.getElementById('editOccObservacion').value = occurrenceObservation(row);
+    document.getElementById('editOccMotivo').value = '';
+    document.getElementById('editOccMotivoGroup').style.display = 'none';
+    $('#modalDetProg').modal('hide');
+    setTimeout(function() { $('#modalEditarOcurrencia').modal('show'); }, 180);
+}
+
+function submitSafeOccurrence(payload, successText) {
+    return fetch('$baseUrl/api/mantenimientos/guardar_prog.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+    }).then(function(response) {
+        return response.json().then(function(json) {
+            if (!response.ok || !json.success) throw new Error(json.error || 'No se pudo actualizar la ocurrencia.');
+            return json;
+        });
+    }).then(function(json) {
+        $('#modalEditarOcurrencia, #modalDetProg').modal('hide');
+        cargarProg();
+        Swal.fire({ icon:'success', title:successText, text:'El cambio quedo registrado en SAP.', timer:1900, showConfirmButton:false });
+        return json;
+    });
+}
+
+function saveSafeOccurrenceEdit() {
+    var code = document.getElementById('editOccCode').value;
+    var fecha = document.getElementById('editOccFecha').value;
+    var fechaOriginal = document.getElementById('editOccFecha').getAttribute('data-original-date') || '';
+    var fechaCambio = fecha !== fechaOriginal;
+    var observacion = document.getElementById('editOccObservacion').value.trim();
+    var motivo = document.getElementById('editOccMotivo').value.trim();
+    if (!fecha || (fechaCambio && motivo.length < 4)) {
+        Swal.fire(
+            'Datos requeridos',
+            fechaCambio
+                ? 'Ingrese un motivo de al menos 4 caracteres para reprogramar.'
+                : 'Conserve una fecha programada valida.',
+            'warning'
+        );
+        return;
+    }
+    var button = document.getElementById('btnGuardarOcurrenciaSegura');
+    var oldHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Guardando';
+    submitSafeOccurrence({
+        action: 'update_occurrence_safe',
+        code: code,
+        fecha: fecha,
+        observacion: observacion,
+        motivo: motivo,
+        cancelar: false
+    }, 'Ocurrencia actualizada').catch(function(error) {
+        Swal.fire('No se pudo guardar', error.message, 'error');
+    }).then(function() {
+        button.disabled = false;
+        button.innerHTML = oldHtml;
+    });
+}
+
+function cancelSafeOccurrence(code) {
+    var row = rowByOccurrenceCode(code);
+    if (!occurrenceEditable(row)) {
+        Swal.fire('Ocurrencia bloqueada', 'No se puede cancelar porque tiene OT o ya fue ejecutada.', 'warning');
+        return;
+    }
+    Swal.fire({
+        title: 'Cancelar ocurrencia?',
+        html: '<b>' + esc(row.Code || '') + '</b><br><span class="text-muted">No se eliminara el registro.</span>',
+        icon: 'warning',
+        input: 'textarea',
+        inputLabel: 'Motivo obligatorio',
+        inputPlaceholder: 'Explique por que se cancela esta ocurrencia',
+        inputAttributes: { maxlength: 220 },
+        showCancelButton: true,
+        confirmButtonText: 'Si, cancelar ocurrencia',
+        cancelButtonText: 'Volver',
+        confirmButtonColor: '#dc3545',
+        inputValidator: function(value) {
+            if (!value || value.trim().length < 4) return 'Ingrese un motivo de al menos 4 caracteres.';
+        }
+    }).then(function(result) {
+        if (!result.isConfirmed) return;
+        submitSafeOccurrence({
+            action: 'update_occurrence_safe',
+            code: row.Code,
+            fecha: rawDate(row.U_FechaProg),
+            observacion: occurrenceObservation(row),
+            motivo: String(result.value || '').trim(),
+            cancelar: true
+        }, 'Ocurrencia cancelada').catch(function(error) {
+            Swal.fire('No se pudo cancelar', error.message, 'error');
+        });
+    });
+}
+
+function eliminarProgramacion(planCode, planName, totalLineas) {
+    if (!planCode) return;
+    Swal.fire({
+        title: 'Eliminar programación?',
+        html: '<b>Plan:</b> ' + esc(planCode)
+            + '<br><b>Descripción:</b> ' + esc(planName || '-')
+            + '<br><b>Ocurrencias:</b> ' + esc(totalLineas || 0)
+            + '<hr class="my-2"><span class="text-danger font-weight-bold">Se eliminarán también todas sus ocurrencias.</span>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545'
+    }).then(function(res) {
+        if (!res.isConfirmed) return;
+        fetch('$baseUrl/api/mantenimientos/guardar_prog.php', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ action: 'delete', code: planCode })
+        })
+        .then(function(r){ return r.json().then(function(j){ j._status = r.status; return j; }); })
+        .then(function(json) {
+            if (!json.success) {
+                if (json._status === 404) {
+                    removePlanFromUi(planCode);
+                    cargarProg();
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Programacion ya eliminada',
+                        text: 'Se actualizo el listado.',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    return;
+                }
+                Swal.fire('No se pudo eliminar', json.error || 'Error al eliminar la programación.', json._status === 409 ? 'warning' : 'error');
+                return;
+            }
+            removePlanFromUi(planCode);
+            Swal.fire({
+                icon: 'success',
+                title: 'Programación eliminada',
+                text: 'Se eliminaron ' + (json.deleted_occurrences || 0) + ' ocurrencias.',
+                timer: 1800,
+                showConfirmButton: false
+            });
+            cargarProg();
+        })
+        .catch(function(err) {
+            Swal.fire('Error conexión', err.message, 'error');
+        });
+    });
+}
+
+$(document).on('click', '.btn-ver-prog', function() {
+    openProgDetailByCode($(this).data('code'), $(this).data('plan'));
+});
+$(document).on('click', '.btn-edit-occurrence', function() {
+    openSafeOccurrenceEdit($(this).data('code'));
+});
+$(document).on('click', '#btnEditarOcurrenciaDetalle', function() {
+    openSafeOccurrenceEdit($(this).data('code'));
+});
+$(document).on('click', '#btnCancelarOcurrenciaDetalle', function() {
+    cancelSafeOccurrence($(this).data('code'));
+});
+$(document).on('click', '#btnGuardarOcurrenciaSegura', function() {
+    saveSafeOccurrenceEdit();
+});
+$(document).on('change input', '#editOccFecha', function() {
+    var original = this.getAttribute('data-original-date') || '';
+    var changed = this.value !== original;
+    document.getElementById('editOccMotivoGroup').style.display = changed ? '' : 'none';
+    if (!changed) document.getElementById('editOccMotivo').value = '';
+});
+$(document).on('click', '.btn-ver-plan', function() {
+    var planCode = $(this).data('plan');
+    openPlanDetail(planCode);
+});
+$(document).on('click', '.btn-edit-plan-safe', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    openSafePlanEdit($(this).data('plan'));
+});
+$(document).on('click', '#btnGuardarDatosPlan', function() {
+    saveSafePlanEdit();
+});
+$(document).on('input', '#editPlanObservacion', function() {
+    document.getElementById('editPlanObsCount').textContent = this.value.length;
+});
+$(document).on('click', '.btn-delete-plan', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    eliminarProgramacion($(this).data('plan'), $(this).data('name'), $(this).data('total'));
+});
+$(document).on('click', '#planesResumenBody tr', function(e) {
+    if ($(e.target).closest('.btn-ver-plan, .btn-edit-plan-safe, .btn-delete-plan').length) return;
+    var btn = $(this).find('.btn-ver-plan');
+    if (btn.length) {
+        selectPlan(btn.data('plan'));
+    }
+});
+$(document).on('click', '#btnClearPlanFilter', function() {
+    selectPlan('');
+});
+$(document).on('click', '.status-filter-card', function() {
+    selectEstado(String($(this).data('status-filter') || ''));
+});
+$(document).on('click', '#btnClearEstadoFilter', function() {
+    selectEstado('');
+});
+$(document).on('change', '#filtroAnioProg', function() {
+    selectedYear = String(this.value || '{$currentYear}');
+    selectedPlanCode = '';
+    applyYearFilter();
+});
+$(document).on('click', '.btn-ver-indicacion', function() {
+    var row = rowByOccurrenceCode($(this).data('code'));
+    if (!row || !isCustomOccurrenceObservation(row)) return;
+    Swal.fire({
+        title: 'Indicación personalizada',
+        html: '<div class="text-left">'
+            + '<div class="mb-2"><b>Ocurrencia:</b> ' + esc(row.Code || '-') + '</div>'
+            + '<div class="mb-2"><b>Fecha:</b> ' + esc(fmt(row.U_FechaProg)) + '</div>'
+            + '<div class="alert alert-warning mb-0" style="white-space:pre-wrap;">' + esc(occurrenceObservation(row)) + '</div>'
+            + '<small class="text-muted d-block mt-2">Solo aplica a esta ocurrencia.</small></div>',
+        icon: 'info',
+        confirmButtonText: 'Entendido'
+    });
+});
+$(document).on('click', '#btnGenerarOT', function() {
+    var code = $(this).data('code');
+    if (!code) return;
+    window.location.href = 'nueva_ot.php?prog=' + encodeURIComponent(code);
+});
+
+function importProgLog(msg) {
+    var el = document.getElementById('importProgLog');
+    if (!el) return;
+    el.textContent += msg + "\\n";
+    el.scrollTop = el.scrollHeight;
+}
+function importProgStatus(msg) {
+    var el = document.getElementById('importProgStatus');
+    if (el) el.textContent = msg;
+}
+function importProgCounter() {
+    var el = document.getElementById('importProgCounter');
+    if (!el) return;
+    el.textContent = 'Insertados: ' + importProgTotals.inserted
+        + ' | Actualizados: ' + importProgTotals.updated
+        + ' | Omitidos: ' + importProgTotals.skipped
+        + ' | Errores: ' + importProgTotals.errors;
+}
+function resetImportProgUi() {
+    importProgToken = '';
+    importProgStart = 2;
+    importProgChunk = 500;
+    importProgTotals = {inserted:0, updated:0, skipped:0, errors:0};
+    var form = document.getElementById('formImportProg');
+    if (form) form.reset();
+    var box = document.getElementById('boxImportProgProgress');
+    if (box) box.style.display = 'none';
+    var log = document.getElementById('importProgLog');
+    if (log) log.textContent = '';
+    var bar = document.getElementById('importProgBar');
+    if (bar) bar.style.width = '0%';
+    var btn = document.getElementById('btnStartImportProg');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-database mr-1"></i>Iniciar importacion';
+    }
+    importProgStatus('Listo');
+    importProgCounter();
+}
+function processImportProgNext() {
+    var body = new URLSearchParams({
+        action:'batch',
+        token:importProgToken,
+        start:String(importProgStart),
+        chunk:String(importProgChunk)
+    });
+    return fetch(importProgUrl, {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+        body:body.toString()
+    })
+    .then(function(r){ return r.json().then(function(j){ j._ok = r.ok; return j; }); })
+    .then(function(json) {
+        if (!json._ok || !json.success) throw new Error(json.error || 'Error en lote');
+        importProgTotals.inserted += json.inserted || 0;
+        importProgTotals.updated += json.updated || 0;
+        importProgTotals.skipped += json.skipped || 0;
+        importProgTotals.errors += json.errors_count || 0;
+        importProgCounter();
+        importProgLog(json.message || 'Lote procesado.');
+        (json.errors || []).forEach(function(e) {
+            importProgLog('OMITIDA fila ' + (e.row || '-') + ': ' + (e.error || 'Error') + ' | Code=' + (e.code || ''));
+        });
+        if (json.done) {
+            document.getElementById('importProgBar').style.width = '100%';
+            importProgStatus('Terminado');
+            var btnDone = document.getElementById('btnStartImportProg');
+            btnDone.disabled = false;
+            btnDone.innerHTML = '<i class="fas fa-check mr-1"></i>Carga terminada';
+            cargarProg();
+            return;
+        }
+        importProgStart = json.nextStart || (importProgStart + importProgChunk);
+        document.getElementById('importProgBar').style.width = Math.min(95, (importProgStart % 20000) / 200) + '%';
+        setTimeout(function() {
+            processImportProgNext().catch(function(err) {
+                importProgStatus('Error');
+                importProgLog('ERROR: ' + err.message);
+                var btnRetry = document.getElementById('btnStartImportProg');
+                btnRetry.disabled = false;
+                btnRetry.textContent = 'Reintentar desde fila ' + importProgStart;
+            });
+        }, 80);
+    });
+}
+
+$(document).on('click', '#btnOpenImportProg', function() {
+    resetImportProgUi();
+    $('#modalImportProg').modal('show');
+});
+$(document).on('submit', '#formImportProg', function(e) {
+    e.preventDefault();
+    var fd = new FormData(this);
+    fd.append('action', 'prepare');
+    var box = document.getElementById('boxImportProgProgress');
+    var btn = document.getElementById('btnStartImportProg');
+    var prepareBtn = document.getElementById('btnPrepareImportProg');
+    box.style.display = 'block';
+    document.getElementById('importProgLog').textContent = '';
+    document.getElementById('importProgBar').style.width = '0%';
+    importProgTotals = {inserted:0, updated:0, skipped:0, errors:0};
+    importProgCounter();
+    importProgStatus('Subiendo archivo...');
+    btn.disabled = true;
+    prepareBtn.disabled = true;
+    fetch(importProgUrl, {method:'POST', body:fd})
+        .then(function(r){ return r.json().then(function(j){ j._ok = r.ok; return j; }); })
+        .then(function(json) {
+            prepareBtn.disabled = false;
+            if (!json._ok || !json.success) throw new Error(json.error || 'No se pudo preparar el archivo.');
+            importProgToken = json.token;
+            importProgStart = json.start || 2;
+            importProgChunk = json.chunk || 500;
+            importProgStatus('Archivo listo');
+            importProgLog(json.message || 'Archivo preparado.');
+            btn.disabled = false;
+        })
+        .catch(function(err) {
+            prepareBtn.disabled = false;
+            importProgStatus('Error');
+            importProgLog('ERROR: ' + err.message);
+        });
+});
+$(document).on('click', '#btnStartImportProg', function() {
+    if (!importProgToken) return;
+    this.disabled = true;
+    this.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Procesando...';
+    importProgStatus('Procesando lotes...');
+    processImportProgNext().catch(function(err) {
+        importProgStatus('Error');
+        importProgLog('ERROR: ' + err.message);
+        var btn = document.getElementById('btnStartImportProg');
+        btn.disabled = false;
+        btn.textContent = 'Reintentar desde fila ' + importProgStart;
+    });
+});
+$(document).ready(function() {
+    cargarProg();
+});
+JS;
+
+include_once(__DIR__ . '/../../layouts/footer.php');
+?>
